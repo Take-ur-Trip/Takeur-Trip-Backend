@@ -1,0 +1,16 @@
+{
+    "messages": {
+        "userAlreadyRegistred": {
+            "errorCode": "U11",
+            "errorMessage": "User has been already registred."
+        },
+        "couldntRegisterUser" : {
+            "errorCode": "U12",
+            "errorMessage": "Couldn't register user."
+        },
+        "registredUser" : {
+            "errorCode": "U13",
+            "errorMessage": "User has been registred."
+        }
+    }
+}
