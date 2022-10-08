@@ -1,16 +1,32 @@
 {
+    "default" : {
+        "host" : "localhost",
+        "port" : "8080"
+    },
     "messages": {
         "userAlreadyRegistred": {
-            "errorCode": "U11",
-            "errorMessage": "User has been already registred."
+            "msgCode": "U11",
+            "msg": "User has been already registred."
         },
         "couldntRegisterUser" : {
-            "errorCode": "U12",
-            "errorMessage": "Couldn't register user."
+            "msgCode": "U12",
+            "msg": "Couldn't register user."
         },
         "registredUser" : {
-            "errorCode": "U13",
-            "errorMessage": "User has been registred."
+            "msgCode": "U13",
+            "msg": "User has been registred."
+        },
+        "verifyError" : {
+            "msgCode": "V1",
+            "msg": "Verification error."
+        },
+        "verifySuccessful" : {
+            "msgCode": "V2",
+            "msg": "Verification successful."
+        },
+        "alreadyVerified" : {
+            "msgCode": "V3",
+            "msg": "User has been already verified."
         }
     }
 }
