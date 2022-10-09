@@ -3,7 +3,16 @@ import Mail from 'nodemailer/lib/mailer';
 import * as config from '../config.json';
 require('dotenv').config();
 
-export const sendMail = async (to : string) => {
+export const generateRandomHash = async (length : Number) => {
+    const chars : string = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result : any = '';
+    for(let i=0; i<length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+export const sendMail = async (to : string, verifyHash : string) => {
     type MailOptions = {
         from: string,
         to: string,
@@ -18,21 +27,12 @@ export const sendMail = async (to : string) => {
             pass: process.env.SENDER_EMAIL_PASSWORD
         }
     })
-
-    const generateRandomHash = (length : Number) => {
-        const chars : string = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result : any = '';
-        for(let i=0; i<length; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-    }
     
     const mailOptions : MailOptions = {
         from: process.env.SENDER_EMAIL || '',
         to: 'nikodemniq@gmail.com',
         subject: "Aktywacja konta - Takeur' Trip",
-        html: `<h1>Aktywuj swoje konto</h1><a href="http://${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${generateRandomHash(30)}">Aktywacja konta ${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${generateRandomHash(30)}</a>`
+        html: `<h1>Aktywuj swoje konto</h1><a href="http://${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${verifyHash}">Tutaj</a>`
       };
 
     const email = await emailTransporter.sendMail(mailOptions);
