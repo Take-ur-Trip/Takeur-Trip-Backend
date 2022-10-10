@@ -27,6 +27,22 @@
         "alreadyVerified" : {
             "msgCode": "V3",
             "msg": "User has been already verified."
+        },
+        "authIncorrectCredentials" : {
+            "msgCode": "A11",
+            "msg": "Incorrect credentials."
+        },
+        "authError" : {
+            "msgCode": "A12",
+            "msg": "Auth error."
+        },
+        "authSuccess" : {
+            "msgCode": "A21",
+            "msg": "Authenticated."
+        },
+        "tokenInvalid" : {
+            "msgCode": "T11",
+            "msg": "Invalid or expired token."
         }
     }
 }
