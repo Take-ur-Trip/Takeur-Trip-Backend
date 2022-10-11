@@ -55,7 +55,7 @@ router.get('/verify', async (req : Request, res: Response) => {
         if(isVerified.length > 0) {
             res.json(config.messages.alreadyVerified)
         } else {
-            const { rowCount : verify } : QueryResult = await query(`UPDATE "public.Users" SET verification='1' WHERE email LIKE $1 AND verification LIKE $2`, [email, hash]);
+            const { rowCount : verify } : QueryResult = await query(`UPDATE "public.Users" SET verification='1' WHERE  email LIKE $1 AND verification LIKE $2`, [email, hash]);
             if(verify < 1) {
                 res.json(config.messages.verifyError);
             } else {
@@ -78,11 +78,53 @@ router.post('/auth', async (req : Request, res : Response) => {
         if(!encryptedPassword) {
             res.json(config.messages.authIncorrectCredentials);
         } else {
-            const token : string = jwt.sign(emailRows[0].email, secretKeyJwt);
-            const tokenObj : Object = { token };
-            res.json({...config.messages.authSuccess, ...tokenObj})
+            const { rowCount : banned } = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE email = $1 AND "isBanned" = true`, [email]);
+            if(!banned) {
+                const token : string = jwt.sign(emailRows[0].email, secretKeyJwt);
+                const tokenObj : Object = { token };
+                res.json({...config.messages.authSuccess, ...tokenObj})
+            } else {
+                res.json(config.messages.userBanned)
+            }
         }
     }
 })
+
+router.post('/ban/:userId', async (req: Request, res: Response) => {
+    const masterPasswordSecret : Secret = process.env.MASTER_PASSWORD as Secret;
+    const masterPassword = req.body.masterPassword as string;
+    const userId = req.params.userId as string;
+    if(masterPasswordSecret == masterPassword) {
+        const { rows : emailRows} = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE "userId" = $1`, [userId]);
+        const { rowCount } : QueryResult = await query(`UPDATE "public.Users" SET "isBanned"=true WHERE email=$1 AND ("isBanned" is NULL OR "isBanned"=false)`, [emailRows[0].email as string]);
+        console.log(rowCount)
+        if((rowCount < 1)) {
+            res.json(config.messages.userAlreadyBanned);
+        } else {
+            res.json(config.messages.bannedSuccessful);
+        }
+    } else {
+        res.json(config.messages.authIncorrectCredentials);
+    }
+})
+
+router.post('/unban/:userId', async (req: Request, res: Response) => {
+    const masterPasswordSecret : Secret = process.env.MASTER_PASSWORD as Secret;
+    const masterPassword = req.body.masterPassword as string;
+    const userId = req.params.userId as string;
+    if(masterPasswordSecret == masterPassword) {
+        const { rows : emailRows} = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE "userId" = $1`, [userId]);
+        const { rowCount } : QueryResult = await query(`UPDATE "public.Users" SET "isBanned"=false WHERE email=$1 AND "isBanned"=true`, [emailRows[0].email as string]);
+        if((rowCount < 1)) {
+            res.json(config.messages.hasntBanned);
+        } else {
+            res.json(config.messages.unbannedSuccessful);
+        }
+    } else {
+        res.json(config.messages.authIncorrectCredentials);
+    }
+})
+
+
 
 export default router;

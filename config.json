@@ -43,6 +43,26 @@
         "tokenInvalid" : {
             "msgCode": "T11",
             "msg": "Invalid or expired token."
+        },
+        "userBanned" : {
+            "msgCode": "B11",
+            "msg": "User banned."
+        },
+        "userAlreadyBanned" : {
+            "msgCode": "B12",
+            "msg": "User already banned."
+        },
+        "bannedSuccessful" : {
+            "msgCode": "B21",
+            "msg": "User has been banned."
+        },
+        "unbannedSuccessful" : {
+            "msgCode": "B22",
+            "msg": "User has been unbanned."
+        },
+        "hasntBanned" : {
+            "msgCode": "B31",
+            "msg": "User hasn't ban."
         }
     }
 }
