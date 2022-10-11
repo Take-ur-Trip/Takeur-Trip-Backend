@@ -4,6 +4,10 @@
         "port" : "8080"
     },
     "messages": {
+        "fetchingUserError": {
+            "msgCode": "U21",
+            "msg": "Error with fetching user(s)."
+        },
         "userAlreadyRegistred": {
             "msgCode": "U11",
             "msg": "User has been already registred."

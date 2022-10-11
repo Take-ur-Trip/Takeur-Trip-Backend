@@ -66,7 +66,6 @@ router.get('/verify', async (req : Request, res: Response) => {
 })
 
 // Auth
-
 router.post('/auth', async (req : Request, res : Response) => {
     const email = req.body.email as string;
     const password = req.body.password as string;
@@ -125,6 +124,25 @@ router.post('/unban/:userId', async (req: Request, res: Response) => {
     }
 })
 
+// Only for authenticated users ( Protected routes )
+router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
+    try {
+        const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);
+        res.json(users);
+    } catch(err) {
+        res.json(config.messages.fetchingUserError);
+    }
+})
+
+router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
+    try {
+        const userId : string = req.params.id;
+        const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE "userId" = $1`, [userId]);
+        res.json(user);
+    } catch(err) {
+        res.json(config.messages.fetchingUserError);
+    }
+})
 
 
 export default router;
