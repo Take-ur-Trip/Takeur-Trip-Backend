@@ -67,6 +67,18 @@
         "hasntBanned" : {
             "msgCode": "B31",
             "msg": "User hasn't ban."
+        },
+        "addingRatingError" : {
+            "msgCode": "R11",
+            "msg": "Error with adding rating."
+        },
+        "rateSuccessfulAdded" : {
+            "msgCode": "R21",
+            "msg": "Added rate."
+        },
+        "fetchRatingError" : {
+            "msgCode": "R31",
+            "msg": "Error with fetching rating(s)."
         }
     }
 }

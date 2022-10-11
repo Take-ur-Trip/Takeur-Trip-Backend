@@ -17,6 +17,7 @@ export const jwtAuth = async (req: Request, res: Response, next: NextFunction) =
 
         const payload = jwt.verify(token, secretKeyJwt);
         (req as JwtPayloadRequest).token = payload;
+        res.locals.token = payload;
     
         next();
     } catch(err) {
