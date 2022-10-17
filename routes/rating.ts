@@ -2,11 +2,10 @@ import { Router, Response, Request } from "express";
 import query from "../middlewares/db";
 import { jwtAuth } from "../middlewares/jwt";
 import config from "../config.json";
-import { format } from "path";
 const router = Router();
 
 // Add rating
-router.post('/:userId', jwtAuth, async (req: Request, res: Response) => {
+router.post('/rate/:userId', jwtAuth, async (req: Request, res: Response) => {
     const userId : string = req.params.userId as string;
     const amount : string | any = req.query.amount as string;
     const tokenPayload = res.locals.token; // payload -> logged in User <-> giver
@@ -42,6 +41,6 @@ router.get('/:userId', jwtAuth, async (req: Request, res: Response) => {
     } catch(error) {
         res.json(config.messages.fetchRatingError)
     }
-})
+}) 
 
 export default router;

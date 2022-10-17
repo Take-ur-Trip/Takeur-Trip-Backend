@@ -11,8 +11,10 @@ App.use(bodyParser.json())
 // Routes
 import userRoutes from './routes/users';
 import ratingRoutes from './routes/rating';
+import tripRoutes from './routes/trip';
 App.use('/users', userRoutes);
-App.use('/rate', ratingRoutes);
+App.use('/rating', ratingRoutes);
+App.use('/trip', tripRoutes);
 
 App.listen(port, () => {
     console.log(`Server is listening on port: ${port}`);

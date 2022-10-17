@@ -94,7 +94,7 @@ router.post('/ban/:userId', async (req: Request, res: Response) => {
     const masterPassword = req.body.masterPassword as string;
     const userId = req.params.userId as string;
     if(masterPasswordSecret == masterPassword) {
-        const { rows : emailRows} = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE "userId" = $1`, [userId]);
+        const { rows : emailRows} : QueryResult = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE "userId" = $1`, [userId]);
         const { rowCount } : QueryResult = await query(`UPDATE "public.Users" SET "isBanned"=true WHERE email=$1 AND ("isBanned" is NULL OR "isBanned"=false)`, [emailRows[0].email as string]);
         console.log(rowCount)
         if((rowCount < 1)) {
@@ -125,6 +125,8 @@ router.post('/unban/:userId', async (req: Request, res: Response) => {
 })
 
 // Only for authenticated users ( Protected routes )
+
+//Fetching user(s) data
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
         const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);

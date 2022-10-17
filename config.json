@@ -3,6 +3,11 @@
         "host" : "localhost",
         "port" : "8080"
     },
+    "tripStatus" : {
+        "booked" : "BOOKED",
+        "active" : "ACTIVE",
+        "done" : "DONE"
+    },
     "messages": {
         "fetchingUserError": {
             "msgCode": "U21",
@@ -56,6 +61,10 @@
             "msgCode": "B12",
             "msg": "User already banned."
         },
+        "userIsNotDriver" : {
+            "msgCode": "U31",
+            "msg": "User is not a driver."
+        },
         "bannedSuccessful" : {
             "msgCode": "B21",
             "msg": "User has been banned."
@@ -79,6 +88,22 @@
         "fetchRatingError" : {
             "msgCode": "R31",
             "msg": "Error with fetching rating(s)."
+        },
+        "bookingError" : {
+            "msgCode": "BK21",
+            "msg": "Error with booking trip."
+        },
+        "bookingSuccess" : {
+            "msgCode": "BK11",
+            "msg": "Trip booking successful."
+        },
+        "acceptingTripError" : {
+            "msgCode": "BKA21",
+            "msg": "Trip accepting error."
+        },
+        "acceptingTripSuccess" : {
+            "msgCode": "BKA11",
+            "msg": "Trip accepting successful."
         }
     }
 }
