@@ -101,9 +101,21 @@
             "msgCode": "BKA21",
             "msg": "Trip accepting error."
         },
+        "cannotAcceptSelfTrip" : {
+            "msgCode": "BKA22",
+            "msg": "Cannot accept your self trip."
+        },
         "acceptingTripSuccess" : {
             "msgCode": "BKA11",
             "msg": "Trip accepting successful."
+        },
+        "tripAlreadyAccepted" : {
+            "msgCode": "BKA31",
+            "msg": "Trip has been already accepted."
+        },
+        "tripFetchingError" : {
+            "msgCode": "BKA41",
+            "msg": "Trip information fetching error."
         }
     }
 }
