@@ -6,7 +6,8 @@
     "tripStatus" : {
         "booked" : "BOOKED",
         "active" : "ACTIVE",
-        "done" : "DONE"
+        "done" : "DONE",
+        "canceled" : "CANCELED"
     },
     "messages": {
         "fetchingUserError": {
@@ -77,6 +78,9 @@
             "msgCode": "B31",
             "msg": "User hasn't ban."
         },
+
+
+
         "addingRatingError" : {
             "msgCode": "R11",
             "msg": "Error with adding rating."
@@ -89,6 +93,9 @@
             "msgCode": "R31",
             "msg": "Error with fetching rating(s)."
         },
+
+
+
         "bookingError" : {
             "msgCode": "BK21",
             "msg": "Error with booking trip."
@@ -116,6 +123,22 @@
         "tripFetchingError" : {
             "msgCode": "BKA41",
             "msg": "Trip information fetching error."
+        },
+        "tripCancelError" : {
+            "msgCode": "BKC21",
+            "msg": "Trip cancel error."
+        },
+        "tripCancelSuccess" : {
+            "msgCode": "BKC11",
+            "msg": "Trip cancel successful."
+        },
+        "tripAlreadyCanceled" : {
+            "msgCode": "BKC22",
+            "msg": "Trip has been already canceled."
+        },
+        "tripCancelAuthError" : {
+            "msgCode": "BKC23",
+            "msg": "Cannot cancel trip which doesn't belong to you."
         }
     }
 }
