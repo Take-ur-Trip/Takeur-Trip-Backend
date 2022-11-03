@@ -41,10 +41,10 @@ router.post('/register', async (req: Request<CredentialsModel>, res: Response) =
             await log([`REGISTER ACTION ${JSON.stringify(tokenObj)}`, config.response_status.access, config.log_type.USERS]);
             res.json({...config.messages.registredUser, ...tokenObj}).set({
                 'Authorization' : token
-            });
+            }).status(config.response_status.access);
         } else {
             await log([`REGISTER ACTION ${JSON.stringify(user.email)}`, config.response_status.internalError, config.log_type.USERS]);
-            res.json(config.messages.couldntRegisterUser);
+            res.json(config.messages.couldntRegisterUser).status(config.response_status.internalError);
         }
     }
 });
@@ -55,20 +55,20 @@ router.get('/verify', async (req : Request, res: Response) => {
     const { rows : emailRows} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1`, [email]);
     if(emailRows.length < 1) {
         await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.prohibition, config.log_type.USERS]);
-        res.json(config.messages.verifyError);
+        res.json(config.messages.verifyError).status(config.response_status.prohibition);
     } else {
         const { rows : isVerified} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1 AND verification LIKE '1'`, [email]);
         if(isVerified.length > 0) {
             await log([`VERIFY ACTION ${JSON.stringify({...config.messages.alreadyVerified, ...{email}})}`, config.response_status.prohibition, config.log_type.USERS]);
-            res.json(config.messages.alreadyVerified)
+            res.json(config.messages.alreadyVerified).status(config.response_status.prohibition)
         } else {
             const { rowCount : verify } : QueryResult = await query(`UPDATE "public.Users" SET verification='1' WHERE  email LIKE $1 AND verification LIKE $2`, [email, hash]);
             if(verify < 1) {
                 await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.internalError, config.log_type.USERS]);
-                res.json(config.messages.verifyError);
+                res.json(config.messages.verifyError).status(config.response_status.internalError);
             } else {
                 await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.access, config.log_type.USERS]);
-                res.json(config.messages.verifySuccessful);
+                res.json(config.messages.verifySuccessful).status(config.response_status.access);
             }
         }
     }
@@ -81,22 +81,22 @@ router.post('/auth', async (req : Request, res : Response) => {
     const { rows : emailRows} = await query(`SELECT email, password FROM "public.Users" WHERE email LIKE $1`, [email]);
     if(emailRows.length < 1) {
         await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
-        res.json(config.messages.authIncorrectCredentials);
+        res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
     } else {
         const encryptedPassword = await bcrypt.compare(password, emailRows[0].password);
         if(!encryptedPassword) {
             await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
-            res.json(config.messages.authIncorrectCredentials);
+            res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
         } else {
             const { rowCount : banned } = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE email = $1 AND "isBanned" = true`, [email]);
             if(!banned) {
                 const token : string = jwt.sign(emailRows[0].email, secretKeyJwt);
                 const tokenObj : Object = { token };
                 await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.access, config.log_type.USERS]);
-                res.json({...config.messages.authSuccess, ...tokenObj})
+                res.json({...config.messages.authSuccess, ...tokenObj}).status(config.response_status.access)
             } else {
                 await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
-                res.json(config.messages.userBanned)
+                res.json(config.messages.userBanned).status(config.response_status.prohibition)
             }
         }
     }
@@ -109,17 +109,16 @@ router.post('/ban/:userId', jwtAuth, async (req: Request, res: Response) => {
     if(masterPasswordSecret == masterPassword) {
         const { rows : emailRows} : QueryResult = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE "userId" = $1`, [userId]);
         const { rowCount } : QueryResult = await query(`UPDATE "public.Users" SET "isBanned"=true WHERE email=$1 AND ("isBanned" is NULL OR "isBanned"=false)`, [emailRows[0].email as string]);
-        console.log(rowCount)
         if((rowCount < 1)) {
             await log([`BAN ACTION ${JSON.stringify(userId)}`, config.response_status.prohibition, config.log_type.USERS]);
-            res.json(config.messages.userAlreadyBanned);
+            res.json(config.messages.userAlreadyBanned).status(config.response_status.prohibition);
         } else {
             await log([`BAN ACTION ${JSON.stringify(userId)}`, config.response_status.access, config.log_type.USERS]);
-            res.json(config.messages.bannedSuccessful);
+            res.json(config.messages.bannedSuccessful).status(config.response_status.access);
         }
     } else {
         await log([`BAN ACTION ${JSON.stringify(userId)}, ${JSON.stringify(masterPassword)}`, config.response_status.prohibition, config.log_type.USERS]);
-        res.json(config.messages.authIncorrectCredentials);
+        res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
     }
 })
 
@@ -132,14 +131,14 @@ router.post('/unban/:userId', jwtAuth, async (req: Request, res: Response) => {
         const { rowCount } : QueryResult = await query(`UPDATE "public.Users" SET "isBanned"=false WHERE email=$1 AND "isBanned"=true`, [emailRows[0].email as string]);
         if((rowCount < 1)) {
             await log([`UNBAN ACTION ${JSON.stringify(userId)}`, config.response_status.prohibition, config.log_type.USERS]);
-            res.json(config.messages.hasntBanned);
+            res.json(config.messages.hasntBanned).status(config.response_status.prohibition);
         } else {
             await log([`UNBAN ACTION ${JSON.stringify(userId)}`, config.response_status.access, config.log_type.USERS]);
-            res.json(config.messages.unbannedSuccessful);
+            res.json(config.messages.unbannedSuccessful).status(config.response_status.access);
         }
     } else {
         await log([`UNBAN ACTION ${JSON.stringify(userId)}`, config.response_status.prohibition, config.log_type.USERS]);
-        res.json(config.messages.authIncorrectCredentials);
+        res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
     }
 })
 
@@ -149,9 +148,9 @@ router.post('/unban/:userId', jwtAuth, async (req: Request, res: Response) => {
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
         const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);
-        res.json(users);
+        res.json(users).status(config.response_status.access);
     } catch(err) { 
-        res.json(config.messages.fetchingUserError);
+        res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
 })
 
@@ -160,9 +159,9 @@ router.get('/fetchByMail/:email', jwtAuth, async (req : Request, res: Response) 
     try {
         const userEmail : string = req.params.email;
         const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE email = $1`, [userEmail]);
-        res.json(user);
+        res.json(user).status(config.response_status.access);
     } catch(err) {
-        res.json(config.messages.fetchingUserError);
+        res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
 })
 
@@ -171,9 +170,9 @@ router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
     try {
         const userId : string = req.params.id;
         const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE "userId" = $1`, [userId]);
-        res.json(user);
+        res.json(user).status(config.response_status.access);
     } catch(err) {
-        res.json(config.messages.fetchingUserError);
+        res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
 })
 

@@ -19,11 +19,11 @@ App.use(cors({
 import userRoutes from './routes/users';
 import ratingRoutes from './routes/rating';
 import tripRoutes from './routes/trip';
-import testRoutes from './routes/test';
+import loggerRoutes from './routes/logger/logger';
 App.use('/users', userRoutes);
 App.use('/rating', ratingRoutes);
 App.use('/trip', tripRoutes);
-App.use('/test', testRoutes);
+App.use('/logs', loggerRoutes);
 
 App.listen(port, () => {
     console.log(`Server is listening on port: ${port}`);

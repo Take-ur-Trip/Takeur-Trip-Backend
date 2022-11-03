@@ -92,12 +92,10 @@ router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
                 }
             }
         } else {
-            res.json(config.messages.userIsNotDriver);
+            res.json(config.messages.userIsNotDriver).status(config.response_status.prohibition);
         }
     } catch(error) {
-        console.log(error)
-        // error with accepting trip
-        res.json(config.messages.acceptingTripError)
+        res.json(config.messages.acceptingTripError).status(config.response_status.prohibition);
     }
 })
 
@@ -106,7 +104,7 @@ router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
         const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips"`, []);
         res.json(trips).status(config.response_status.access);
     } catch(err) { 
-        res.json(config.messages.tripFetchingError);
+        res.json(config.messages.tripFetchingError).status(config.response_status.prohibition);
     }
 })
 
@@ -114,9 +112,9 @@ router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
     try {
         const tripId = req.params.id;
         const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
-        res.json(trips);
+        res.json(trips).status(config.response_status.access);
     } catch(err) { 
-        res.json(config.messages.tripFetchingError);
+        res.json(config.messages.tripFetchingError).status(config.response_status.prohibition);
     }
 })
 
