@@ -1,5 +1,5 @@
 import { Router, Response, Request } from "express";
-import query from "../middlewares/db";
+import query, {log} from "../middlewares/db";
 import { jwtAuth } from "../middlewares/jwt";
 import config from "../config.json";
 const router = Router();
@@ -16,12 +16,14 @@ router.post('/rate/:userId', jwtAuth, async (req: Request, res: Response) => {
             if(addRateQuery < 1) {
                 throw config.messages.addingRatingError;
             } else {
+                await log([`RATE ACTION ${JSON.stringify(userId)}`, config.response_status.access, config.log_type.RATINGS]);
                 res.json(config.messages.rateSuccessfulAdded).status(config.response_status.access);
             }
         } else {
             throw config.messages.addingRatingError;
         }
     } catch(error) {
+        await log([`RATE ACTION ${JSON.stringify(userId)}`, config.response_status.internalError, config.log_type.RATINGS]);
         res.json(config.messages.addingRatingError).status(config.response_status.internalError);
     }
 })
