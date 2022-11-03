@@ -20,14 +20,15 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
             TODO:
              *reverse geocode (add -> point) 
         */
-       const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status) VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked]);
+       const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
+       const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance) VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints]);
        if(bookQuery > 0) {
-           res.json(config.messages.bookingSuccess);
+           res.json(config.messages.bookingSuccess).status(config.response_status.access);
         } else {
             throw config.messages.bookingError;
         }
     } catch(error) {
-        res.json(config.messages.bookingError);
+        res.json(config.messages.bookingError).status(config.response_status.internalError);
     }
 })
 
@@ -65,19 +66,19 @@ router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
             // handle...
             const { rows : tripQuery } : QueryResult = await query(`SELECT status, "driverId", "passengerId", "startPoint", "endPoint" FROM "public.Trips" WHERE "tripId" = $1`, [tripId as string]);
             if(tripQuery[0].status == config.tripStatus.active) {
-                res.json(config.messages.tripAlreadyAccepted);
+                res.json(config.messages.tripAlreadyAccepted).status(config.response_status.prohibition);
             } else {
                 if(tripQuery[0].passengerId == driverQuery[0].userId) {
-                    res.json(config.messages.cannotAcceptSelfTrip);
+                    res.json(config.messages.cannotAcceptSelfTrip).status(config.response_status.prohibition);
                 } else {
                     const { rowCount : acceptTripQuery } : QueryResult = await query(`UPDATE "public.Trips" SET "driverId" = $1, status = $2, "dateOfAccept" = NOW() WHERE "tripId" = $3`, [driverQuery[0].userId, config.tripStatus.active, tripId]);
                     if(acceptTripQuery < 1) {
-                        res.json(config.messages.acceptingTripError);
+                        res.json(config.messages.acceptingTripError).status(config.response_status.prohibition);
                     } else {
                         const { x : lat1, y: lng1 } = tripQuery[0].startPoint;
                         const { x : lat2, y: lng2 } = tripQuery[0].endPoint;
                         const distanceBetweenPoints : number = getDistanceBetweenPoints(lat1, lng1, lat2, lng2);
-                        res.json({...config.messages.acceptingTripSuccess, ...{startPoint: tripQuery[0].startPoint}, ...{endPoint:tripQuery[0].endPoint}, ...{distance: distanceBetweenPoints}});
+                        res.json({...config.messages.acceptingTripSuccess, ...{startPoint: tripQuery[0].startPoint}, ...{endPoint:tripQuery[0].endPoint}, ...{distance: distanceBetweenPoints}}).status(config.response_status.access);
                     }
                 }
             }
@@ -94,7 +95,7 @@ router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
         const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips"`, []);
-        res.json(trips);
+        res.json(trips).status(config.response_status.access);
     } catch(err) { 
         res.json(config.messages.tripFetchingError);
     }

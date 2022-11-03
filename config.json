@@ -9,6 +9,17 @@
         "done" : "DONE",
         "canceled" : "CANCELED"
     },
+    "response_status": {
+        "access" : 200,
+        "prohibition" : 400,
+        "internalError" : 500
+    },
+    "log_type" : {
+        "USERS" : "USERS",
+        "TRIPS" : "TRIPS",
+        "RATINGS" : "RATINGS",
+        "INTERNAL" : "INTERNAL"
+    },
     "messages": {
         "fetchingUserError": {
             "msgCode": "U21",
