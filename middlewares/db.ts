@@ -2,7 +2,10 @@ import { Pool } from 'pg';
 require('dotenv').config();
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+      }
 });
 
 const query = (text : string, _params : Array<string>) => pool.query(text, _params);
