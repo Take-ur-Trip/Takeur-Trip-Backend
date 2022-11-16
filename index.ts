@@ -3,7 +3,7 @@ import express from "express";
 require('dotenv').config();
 import cors from "cors";
 
-const port = process.env.SERVER_PORT || 8001;
+const port = process.env.PORT || 8080;
 const App = express();
 
 //Middlewares
