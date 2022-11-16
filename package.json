@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "npx tsc",
-    "devOnlyBackendNodemon": "concurrently \"npx tsc --watch\" \"nodemon -q ./dist/index.js\"",
-    "start": "concurrently \"npx tsc --watch\" \"node -q ./dist/index.js\"",
+    "start": "node dist/index.js",
+    "postinstall": "tsc",
+    "devOnlyBackend": "concurrently \"npx tsc --watch\" \"nodemon -q ./dist/index.js\"",
     "dev": "concurrently \"npx tsc --watch\" \"nodemon -q ./dist/index.js\" \"cd ../ && npm start --prefix frontend-dashboard\""
   },
   "author": "",
