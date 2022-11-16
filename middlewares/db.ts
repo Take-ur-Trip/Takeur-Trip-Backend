@@ -1,6 +1,9 @@
 import { Pool } from 'pg';
+require('dotenv').config();
 
-const pool = new Pool();
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL
+});
 
 const query = (text : string, _params : Array<string>) => pool.query(text, _params);
 
