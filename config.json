@@ -154,6 +154,13 @@
         "tripCancelAuthError" : {
             "msgCode": "BKC23",
             "msg": "Cannot cancel trip which doesn't belong to you."
+        },
+
+
+
+        "fetchingLogsError": {
+            "msgCode": "L21",
+            "msg": "Error with fetching logs."
         }
     }
 }

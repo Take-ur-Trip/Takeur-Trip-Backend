@@ -147,8 +147,12 @@ router.post('/unban/:userId', jwtAuth, async (req: Request, res: Response) => {
 //Fetching user(s) data
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);
-        res.json(users).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);
+            res.json(users).status(config.response_status.access);
+        } else {
+            res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
+        }
     } catch(err) { 
         res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
@@ -157,9 +161,13 @@ router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
 
 router.get('/fetchByMail/:email', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const userEmail : string = req.params.email;
-        const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE email = $1`, [userEmail]);
-        res.json(user).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const userEmail : string = req.params.email;
+            const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE email = $1`, [userEmail]);
+            res.json(user).status(config.response_status.access);
+        } else {
+            res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
+        }
     } catch(err) {
         res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
@@ -168,11 +176,38 @@ router.get('/fetchByMail/:email', jwtAuth, async (req : Request, res: Response) 
 
 router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const userId : string = req.params.id;
-        const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE "userId" = $1`, [userId]);
-        res.json(user).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const userId : string = req.params.id;
+            const { rows : user} = await query(`SELECT * FROM "public.Users" WHERE "userId" = $1`, [userId]);
+            res.json(user).status(config.response_status.access);
+        } else {
+            res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
+        }
     } catch(err) {
         res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
+    }
+})
+
+
+// Admin dashboard routes!
+router.post('/authAdmin', async (req : Request, res : Response) => {
+    const login = req.body.login as string;
+    const password = req.body.password as string;
+    const { rows : loginRows} = await query(`SELECT login, password FROM "public.AdminUsers" WHERE login LIKE $1`, [login]);
+    if(loginRows.length < 1) {
+        await log([`AUTH ACTION ${JSON.stringify(login)} TO ADMIN DASHBOARD`, config.response_status.prohibition, config.log_type.USERS]);
+        res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
+    } else {
+        const encryptedPassword = await bcrypt.compare(password, loginRows[0].password);
+        if(!encryptedPassword) {
+            await log([`AUTH ACTION ${JSON.stringify(login)} TO ADMIN DASHBOARD`, config.response_status.prohibition, config.log_type.USERS]);
+            res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
+        } else {
+            const token : string = jwt.sign({login: loginRows[0].login, isAdmin: true}, secretKeyJwt);
+            const tokenObj : Object = { token };
+            await log([`AUTH ACTION ${JSON.stringify(login)} TO ADMIN DASHBOARD`, config.response_status.access, config.log_type.USERS]);
+            res.json({...config.messages.authSuccess, ...tokenObj}).status(config.response_status.access)
+        }
     }
 })
 

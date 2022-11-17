@@ -30,7 +30,7 @@ export const sendMail = async (to : string, verifyHash : string) => {
     
     const mailOptions : MailOptions = {
         from: process.env.SENDER_EMAIL || '',
-        to: 'nikodemniq@gmail.com, lichtarski.radek@gmail.com',
+        to: 'nikodemniq@gmail.com',
         subject: "Aktywacja konta - Takeur' Trip",
         html: `<h1>Aktywuj swoje konto</h1><a href="http://${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${verifyHash}">Tutaj</a>`
       };

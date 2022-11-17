@@ -7,10 +7,14 @@ const router = Router();
 
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const { rows : logs} = await query(`SELECT * FROM "public.Logs"`, []);
-        res.json(logs).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const { rows : logs} = await query(`SELECT * FROM "public.Logs"`, []);
+            res.json(logs).status(config.response_status.access);
+        } else {
+            res.json(config.messages.fetchingLogsError).status(config.response_status.prohibition);
+        }
     } catch(err) { 
-        res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
+        res.json(config.messages.fetchingLogsError).status(config.response_status.prohibition);
     }
 })
 

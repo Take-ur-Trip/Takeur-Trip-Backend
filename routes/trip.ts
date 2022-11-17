@@ -106,8 +106,12 @@ router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
 
 router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips"`, []);
-        res.json(trips).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips"`, []);
+            res.json(trips).status(config.response_status.access);
+        } else {
+            res.json(config.messages.tripFetchingError).status(config.response_status.prohibition); 
+        }
     } catch(err) { 
         res.json(config.messages.tripFetchingError).status(config.response_status.prohibition);
     }
@@ -115,9 +119,13 @@ router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
 
 router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
     try {
-        const tripId = req.params.id;
-        const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
-        res.json(trips).status(config.response_status.access);
+        if(res.locals.isAdmin) {
+            const tripId = req.params.id;
+            const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
+            res.json(trips).status(config.response_status.access);
+        } else {
+            res.json(config.messages.tripFetchingError).status(config.response_status.prohibition);
+        }
     } catch(err) { 
         res.json(config.messages.tripFetchingError).status(config.response_status.prohibition);
     }

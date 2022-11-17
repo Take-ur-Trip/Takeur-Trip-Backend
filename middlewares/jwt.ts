@@ -15,8 +15,11 @@ export const jwtAuth = async (req: Request, res: Response, next: NextFunction) =
             throw new Error(`${config.messages.tokenInvalid}`);
         }
 
-        const payload = jwt.verify(token, secretKeyJwt);
+        const payload : any = jwt.verify(token, secretKeyJwt);
         (req as JwtPayloadRequest).token = payload;
+        if(payload.isAdmin) {
+            res.locals.isAdmin = { isAdmin: true }
+        }
         res.locals.token = {"email" : payload};
     
         next();
