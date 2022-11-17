@@ -74,20 +74,25 @@ router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
                 await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} accept`, config.response_status.prohibition, config.log_type.TRIPS]);
                 res.json(config.messages.tripAlreadyAccepted).status(config.response_status.prohibition);
             } else {
-                if(tripQuery[0].passengerId == driverQuery[0].userId) {
-                    await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} accept`, config.response_status.prohibition, config.log_type.TRIPS]);
-                    res.json(config.messages.cannotAcceptSelfTrip).status(config.response_status.prohibition);
+                if(tripQuery[0].status == config.tripStatus.canceled) {
+                    res.json(config.messages.tripPreviouslyCanceled).status(config.response_status.prohibition);
+                    await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel (previously canceled)`, config.response_status.prohibition, config.log_type.TRIPS]);
                 } else {
-                    const { rowCount : acceptTripQuery } : QueryResult = await query(`UPDATE "public.Trips" SET "driverId" = $1, status = $2, "dateOfAccept" = NOW() WHERE "tripId" = $3`, [driverQuery[0].userId, config.tripStatus.active, tripId]);
-                    if(acceptTripQuery < 1) {
-                        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
-                        res.json(config.messages.acceptingTripError).status(config.response_status.internalError);
+                    if(tripQuery[0].passengerId == driverQuery[0].userId) {
+                        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} accept`, config.response_status.prohibition, config.log_type.TRIPS]);
+                        res.json(config.messages.cannotAcceptSelfTrip).status(config.response_status.prohibition);
                     } else {
-                        const { x : lat1, y: lng1 } = tripQuery[0].startPoint;
-                        const { x : lat2, y: lng2 } = tripQuery[0].endPoint;
-                        const distanceBetweenPoints : number = getDistanceBetweenPoints(lat1, lng1, lat2, lng2);
-                        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.access, config.log_type.TRIPS]);
-                        res.json({...config.messages.acceptingTripSuccess, ...{startPoint: tripQuery[0].startPoint}, ...{endPoint:tripQuery[0].endPoint}, ...{distance: distanceBetweenPoints}}).status(config.response_status.access);
+                        const { rowCount : acceptTripQuery } : QueryResult = await query(`UPDATE "public.Trips" SET "driverId" = $1, status = $2, "dateOfAccept" = NOW() WHERE "tripId" = $3`, [driverQuery[0].userId, config.tripStatus.active, tripId]);
+                        if(acceptTripQuery < 1) {
+                            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
+                            res.json(config.messages.acceptingTripError).status(config.response_status.internalError);
+                        } else {
+                            const { x : lat1, y: lng1 } = tripQuery[0].startPoint;
+                            const { x : lat2, y: lng2 } = tripQuery[0].endPoint;
+                            const distanceBetweenPoints : number = getDistanceBetweenPoints(lat1, lng1, lat2, lng2);
+                            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.access, config.log_type.TRIPS]);
+                            res.json({...config.messages.acceptingTripSuccess, ...{startPoint: tripQuery[0].startPoint}, ...{endPoint:tripQuery[0].endPoint}, ...{distance: distanceBetweenPoints}}).status(config.response_status.access);
+                        }
                     }
                 }
             }

@@ -150,7 +150,6 @@ router.get('/fetch', jwtAuth, async (req : Request, res: Response) => {
         const { rows : users} = await query(`SELECT * FROM "public.Users"`, []);
         res.json(users).status(config.response_status.access);
     } catch(err) { 
-        console.log(err);
         res.json(config.messages.fetchingUserError).status(config.response_status.prohibition);
     }
 })

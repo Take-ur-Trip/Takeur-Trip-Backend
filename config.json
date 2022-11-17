@@ -147,6 +147,10 @@
             "msgCode": "BKC22",
             "msg": "Trip has been already canceled."
         },
+        "tripPreviouslyCanceled" : {
+            "msgCode": "BKC23",
+            "msg": "Trip has been canceled previously. Cannot accept it anymore."
+        },
         "tripCancelAuthError" : {
             "msgCode": "BKC23",
             "msg": "Cannot cancel trip which doesn't belong to you."
