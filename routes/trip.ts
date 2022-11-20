@@ -13,15 +13,9 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
     try{
         const {rows : passengerId} : QueryResult = await query(`SELECT "userId" FROM "public.Users" WHERE email LIKE $1`, [tokenPayload.email]);
         const {startLat, startLon, endLat, endLon} = req.query;
-        // let url = `https://www.google.com/maps/place/${decimal2sexagesimalNext(endLat)},${decimal2sexagesimalNext(endLon)}`;
-        // console.log(url.replace(/\s/g, ''));
-        
-        /* 
-            TODO:
-             *reverse geocode (add -> point) 
-        */
+        const { startAddress, endAddress } = req.body;
        const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
-       const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance) VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints]);
+       const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints, startAddress, endAddress]);
        if(bookQuery > 0) {
             await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} booked`, config.response_status.access, config.log_type.TRIPS]);
            res.json(config.messages.bookingSuccess).status(config.response_status.access);
