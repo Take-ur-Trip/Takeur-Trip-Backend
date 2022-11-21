@@ -32,16 +32,15 @@ router.post('/register', async (req: Request<CredentialsModel>, res: Response) =
         const hashedPassword = await bcrypt.hash(user.password, saltHash);
         const {rowCount : ifRegisteredUser } = await query(`INSERT INTO "public.Users" (email, password, "accountCreated") VALUES($1, $2, NOW())`, [user.email, hashedPassword]);
         if(ifRegisteredUser > 0) {
-            const verifyHash = await generateRandomHash(30);
-            await sendMail(user.email, verifyHash);
-            await log([`REGISTER ACTION ${JSON.stringify({email: user.email, verifyHash})}`, config.response_status.access, config.log_type.USERS]);
-            await query(`UPDATE "public.Users" SET verification=$1 WHERE email LIKE $2`, [verifyHash, user.email]);
-            const token : string = jwt.sign(user.email, secretKeyJwt);
+            // const verifyHash = await generateRandomHash(30);
+            const token : string = jwt.sign({email: user.email}, secretKeyJwt);
+            await sendMail(user.email, token);
+            await log([`REGISTER ACTION ${JSON.stringify({email: user.email, token})}`, config.response_status.access, config.log_type.USERS]);
+            // await query(`UPDATE "public.Users" SET verification=$1 WHERE email LIKE $2`, [verifyHash, user.email]);
             const tokenObj : Object = { token };
-            await log([`REGISTER ACTION ${JSON.stringify(tokenObj)}`, config.response_status.access, config.log_type.USERS]);
-            res.json({...config.messages.registredUser, ...tokenObj}).set({
+            res.set({
                 'Authorization' : token
-            }).status(config.response_status.access);
+            }).json({...config.messages.registredUser, ...tokenObj}).status(config.response_status.access);
         } else {
             await log([`REGISTER ACTION ${JSON.stringify(user.email)}`, config.response_status.internalError, config.log_type.USERS]);
             res.json(config.messages.couldntRegisterUser).status(config.response_status.internalError);
@@ -57,18 +56,23 @@ router.get('/verify', async (req : Request, res: Response) => {
         await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.prohibition, config.log_type.USERS]);
         res.json(config.messages.verifyError).status(config.response_status.prohibition);
     } else {
-        const { rows : isVerified} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1 AND verification LIKE '1'`, [email]);
+        const { rows : isVerified} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1 AND verification = true`, [email]);
         if(isVerified.length > 0) {
             await log([`VERIFY ACTION ${JSON.stringify({...config.messages.alreadyVerified, ...{email}})}`, config.response_status.prohibition, config.log_type.USERS]);
             res.json(config.messages.alreadyVerified).status(config.response_status.prohibition)
         } else {
-            const { rowCount : verify } : QueryResult = await query(`UPDATE "public.Users" SET verification='1' WHERE  email LIKE $1 AND verification LIKE $2`, [email, hash]);
-            if(verify < 1) {
+            const verifyPayload : any = jwt.verify(hash, process.env.JWT_SECRETKEY as Secret);
+            if(!(verifyPayload.email == email)) {
                 await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.internalError, config.log_type.USERS]);
                 res.json(config.messages.verifyError).status(config.response_status.internalError);
             } else {
-                await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.access, config.log_type.USERS]);
-                res.json(config.messages.verifySuccessful).status(config.response_status.access);
+                const verifyQuery : QueryResult = await query(`UPDATE "public.Users" SET verification=true WHERE  email LIKE $1`, [email]);
+                if(verifyQuery.rowCount <= 0) {
+                    res.json(config.messages.verifyError).status(config.response_status.internalError);
+                } else {
+                    await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.access, config.log_type.USERS]);
+                    res.json(config.messages.verifySuccessful).status(config.response_status.access);
+                }
             }
         }
     }
@@ -78,7 +82,7 @@ router.get('/verify', async (req : Request, res: Response) => {
 router.post('/auth', async (req : Request, res : Response) => {
     const email = req.body.email as string;
     const password = req.body.password as string;
-    const { rows : emailRows} = await query(`SELECT email, password FROM "public.Users" WHERE email LIKE $1`, [email]);
+    const { rows : emailRows} = await query(`SELECT * FROM "public.Users" WHERE email LIKE $1`, [email]);
     if(emailRows.length < 1) {
         await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
         res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
@@ -93,7 +97,7 @@ router.post('/auth', async (req : Request, res : Response) => {
                 const token : string = jwt.sign(emailRows[0].email, secretKeyJwt);
                 const tokenObj : Object = { token };
                 await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.access, config.log_type.USERS]);
-                res.json({...config.messages.authSuccess, ...tokenObj}).status(config.response_status.access)
+                res.json({...config.messages.authSuccess, ...tokenObj, user: {emailRows}}).status(config.response_status.access)
             } else {
                 await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
                 res.json(config.messages.userBanned).status(config.response_status.prohibition)
