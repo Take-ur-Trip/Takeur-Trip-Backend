@@ -89,6 +89,10 @@
             "msgCode": "B31",
             "msg": "User hasn't ban."
         },
+        "couldntBanOrUnban" : {
+            "msgCode": "B32",
+            "msg": "Error with banning or unbanning user."
+        },
 
 
 

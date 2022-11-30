@@ -2,9 +2,25 @@ import bodyParser from "body-parser";
 import express from "express";
 require('dotenv').config();
 import cors from "cors";
+import { createServer } from "http";
+import { Server } from "socket.io";
+
 
 const port = process.env.PORT || 8080;
 const App = express();
+const httpServer = createServer(App);
+const io = new Server(httpServer);
+
+io.on('connection', (socket) => {
+  console.log('a user connected');
+
+  socket.on('bookRide', data => {
+    console.log(data);
+    socket.emit('bookedRide', data);
+  })
+});
+
+
 
 //Middlewares
 App.use(bodyParser.json())
@@ -25,7 +41,7 @@ App.use('/rating', ratingRoutes);
 App.use('/trip', tripRoutes);
 App.use('/logs', loggerRoutes);
 
-App.listen(port, () => {
+httpServer.listen(port, () => {
     console.log(`Server is listening on port: ${port}`);
 });
 
