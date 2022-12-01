@@ -20,7 +20,7 @@ router.post('/rate/:userId', jwtAuth, async (req: Request, res: Response) => {
                 res.json(config.messages.rateSuccessfulAdded).status(config.response_status.access);
             }
         } else {
-            throw config.messages.addingRatingError;
+            res.json(config.messages.addingRatingError).status(config.response_status.internalError);
         }
     } catch(error) {
         await log([`RATE ACTION ${JSON.stringify(userId)}`, config.response_status.internalError, config.log_type.RATINGS]);
@@ -42,7 +42,14 @@ router.get('/fetch/:userId', jwtAuth, async (req: Request, res: Response) => {
             const resObject : Object = { email: userRating[0].email, avgAmount: Math.round(avgRating)}
             res.json(resObject).status(config.response_status.access);
         } else {
-            res.json(config.messages.fetchRatingError).status(config.response_status.internalError)
+            const { rows : userRating } = await query(`SELECT amount, email FROM "public.Ratings" as "r","public.Users" as "u" WHERE "r"."userId" = $1 AND "r"."userId" = "u"."userId"`, [userId]);
+            let avgRating : number = 0;
+            for(const rating of userRating) {
+                avgRating += rating.amount as number;
+            }
+            avgRating /= userRating.length;
+            const resObject : Object = { email: userRating[0].email, avgAmount: Math.round(avgRating)}
+            res.json(resObject).status(config.response_status.access);
         }
     } catch(error) {
         res.json(config.messages.fetchRatingError).status(config.response_status.internalError)
@@ -59,8 +66,11 @@ router.get('/fetch', jwtAuth, async (req: Request, res: Response) => {
             })
             res.json(roundedRating).status(config.response_status.access);
         } else {
-            res.json(config.messages.fetchRatingError).status(config.response_status.internalError)
-        }
+            const { rows : userRating } = await query(`SELECT sum(amount), count(amount), avg(amount) as "averageRating", email FROM "public.Ratings" as "r","public.Users" as "u" WHERE "r"."userId" = "u"."userId" group by "u".email`, []);
+            const roundedRating = userRating.map(el => {
+                return {email: el.email, avgRating: Math.round(el.averageRating)};
+            })
+            res.json(roundedRating).status(config.response_status.access);        }
     } catch(error) {
         res.json(config.messages.fetchRatingError).status(config.response_status.internalError)
     }

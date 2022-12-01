@@ -1,6 +1,9 @@
 import { createTransport, SentMessageInfo } from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
 import * as config from '../config.json';
+import fs from "fs";
+import path from "path";
+import handlebars from "handlebars";
 require('dotenv').config();
 
 export const generateRandomHash = async (length : Number) => {
@@ -11,6 +14,9 @@ export const generateRandomHash = async (length : Number) => {
     }
     return result;
 }
+
+const htmlSrc = fs.readFileSync(path.join(__dirname, 'mailer.template.hbs'), 'utf-8');
+const template = handlebars.compile(htmlSrc);
 
 export const sendMail = async (to : string, verifyHash : string) => {
     type MailOptions = {
@@ -32,7 +38,7 @@ export const sendMail = async (to : string, verifyHash : string) => {
         from: process.env.SENDER_EMAIL || '',
         to: 'nikodemniq@gmail.com',
         subject: "Aktywacja konta - Takeur' Trip",
-        html: `<h1>Aktywuj swoje konto</h1><a href="http://${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${verifyHash}">Tutaj</a>`
+        html: template({to, verifyLink: `http://${config.default.default.host}:${config.default.default.port}/users/verify?email=${to}&hash=${verifyHash}`})
       };
 
     const email = await emailTransporter.sendMail(mailOptions);
