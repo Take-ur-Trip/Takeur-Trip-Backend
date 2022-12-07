@@ -3,23 +3,10 @@ import express from "express";
 require('dotenv').config();
 import cors from "cors";
 import { createServer } from "http";
-import { Server } from "socket.io";
-
 
 const port = process.env.PORT || 8080;
 const App = express();
 const httpServer = createServer(App);
-const io = new Server(httpServer);
-
-io.on('connection', (socket) => {
-  console.log('a user connected');
-
-  socket.on('bookRide', data => {
-    console.log(data);
-    socket.emit('bookedRide', data);
-  })
-});
-
 
 
 //Middlewares

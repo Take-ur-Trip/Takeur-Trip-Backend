@@ -58,6 +58,7 @@ router.post('/cancelTrip/:id', jwtAuth, async(req: Request, res: Response) => {
 router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
     try {
         //check if logged in user is driver
+        const suggestedPrice = req.body.suggestedPrice;
         const tokenPayload : any = await res.locals.token as Object; // payload -> logged in User <-> giver
         const {rows : driverQuery} : QueryResult = await query(`SELECT "userId", "isDriver" FROM "public.Users" WHERE email LIKE $1`, [tokenPayload.email]);
         const tripId = req.params.id;

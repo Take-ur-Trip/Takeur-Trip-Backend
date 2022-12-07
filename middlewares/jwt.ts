@@ -20,7 +20,7 @@ export const jwtAuth = async (req: Request, res: Response, next: NextFunction) =
         if(payload.isAdmin) {
             res.locals.isAdmin = { isAdmin: true }
         }
-        res.locals.token = {"email" : payload};
+        res.locals.token = {"email" : payload.email, "userId": payload.userId};
     
         next();
     } catch(err) {

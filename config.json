@@ -93,6 +93,14 @@
             "msgCode": "B32",
             "msg": "Error with banning or unbanning user."
         },
+        "couldntTerminateUser" : {
+            "msgCode": "UT21",
+            "msg": "Error with terminating user."
+        },
+        "terminatingUserSuccessful" : {
+            "msgCode": "UT11",
+            "msg": "Terminating user successfully."
+        },
 
 
 

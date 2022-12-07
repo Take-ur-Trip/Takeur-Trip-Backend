@@ -16,7 +16,7 @@ const secretKeyJwt : Secret = process.env.JWT_SECRETKEY as Secret;
 type CredentialsModel = {
     email : string,
     password : string
-}
+};
 // Registering an user
 router.post('/register', async (req: Request<CredentialsModel>, res: Response) => {
     try {
@@ -31,14 +31,14 @@ router.post('/register', async (req: Request<CredentialsModel>, res: Response) =
         } else {
             const saltHash = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(user.password, saltHash);
-            const {rowCount : ifRegisteredUser } = await query(`INSERT INTO "public.Users" (email, password, "accountCreated") VALUES($1, $2, NOW())`, [user.email, hashedPassword]);
-            if(ifRegisteredUser > 0) {
-                // const verifyHash = await generateRandomHash(30);
-                const token : string = jwt.sign({email: user.email}, secretKeyJwt);
+            const {rowCount: regQuery} = await query(`INSERT INTO "public.Users" (email, password, "accountCreated") VALUES($1, $2, NOW())`, [user.email, hashedPassword]);
+            if(regQuery > 0) {
+                const { rows : registredUser} = await query(`SELECT * FROM "public.Users" WHERE email LIKE $1`, [user.email]);
+                const token : string = jwt.sign({userId: registredUser[0].userId, email: registredUser[0].email}, secretKeyJwt);
                 await sendMail(user.email, token);
                 await log([`REGISTER ACTION ${JSON.stringify({email: user.email, token})}`, config.response_status.access, config.log_type.USERS]);
                 // await query(`UPDATE "public.Users" SET verification=$1 WHERE email LIKE $2`, [verifyHash, user.email]);
-                const resUserObj : Object = { token, email: user.email };
+                const resUserObj : Object = { token, user: registredUser };
                 res.set({
                     'Authorization' : token
                 }).json({...config.messages.registredUser, ...resUserObj}).status(config.response_status.access);
@@ -105,7 +105,7 @@ router.post('/auth', async (req : Request, res : Response) => {
             } else {
                 const { rowCount : banned } = await query(`SELECT email, "isBanned" FROM "public.Users" WHERE email = $1 AND "isBanned" = true`, [email]);
                 if(!banned) {
-                    const token : string = jwt.sign(emailRows[0].email, secretKeyJwt);
+                    const token : string = jwt.sign({userId: emailRows[0].userId,email: emailRows[0].email}, secretKeyJwt);
                     const tokenObj : Object = { token };
                     await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.access, config.log_type.USERS]);
                     res.json({...config.messages.authSuccess, ...tokenObj, user: emailRows}).status(config.response_status.access)
@@ -247,6 +247,39 @@ router.post('/authAdmin', async (req : Request, res : Response) => {
         await log([`MASTER AUTH ACTION ${error}`, config.response_status.internalError, config.log_type.USERS]);
         res.json(config.messages.authError).status(config.response_status.internalError);
     }
+})
+
+router.post('/terminateUser', jwtAuth, async (req: Request, res: Response) => {
+    try {
+        const {email, userId} = res.locals.token;
+        // Check if user exists
+        const { rowCount : emailRowCount} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1`, [email]);
+        if(emailRowCount) {
+            await query(`BEGIN`, []);
+            const { rows : ratingsDeletion} = await query(`DELETE FROM "public.Ratings" where "userId" = $1;`, [userId]);
+            const { rows : tripStatusUpdate} = await query(`UPDATE "public.Trips" SET status='${config.tripStatus.canceled}' WHERE "passengerId" = $1 OR "driverId" = $1;`, [userId]);
+            const { rows : driversUpdate} = await query(`UPDATE "public.Trips" SET "driverId"=null WHERE "driverId" = $1;`, [userId]);
+            const { rows : passengersUpdate} = await query(`UPDATE "public.Trips" SET "passengerId"=null WHERE "passengerId" = $1;`, [userId]);
+            const { rowCount : userDeletion} = await query(`DELETE FROM "public.Users" where "userId" = $1;`, [userId]);
+            await query(`COMMIT;`, []);
+            if(userDeletion && ratingsDeletion && driversUpdate && passengersUpdate && tripStatusUpdate) {  
+                await log([`TERMINATING USER ACTION ${userId}`, config.response_status.access, config.log_type.USERS]);
+                res.json(config.messages.terminatingUserSuccessful).status(config.response_status.access);  
+            } else {
+                console.log(userDeletion)
+                await log([`TERMINATING USER ACTION ${userId}`, config.response_status.internalError, config.log_type.USERS]);
+                res.json(config.messages.couldntTerminateUser).status(config.response_status.internalError);  
+            }
+        } else {
+            await log([`TERMINATING USER ACTION ${userId}`, config.response_status.prohibition, config.log_type.USERS]);
+            res.json(config.messages.couldntTerminateUser).status(config.response_status.prohibition);
+        }
+    } catch (error) {
+        console.log(error)
+        await log([`TERMINATING USER ACTION ${error}`, config.response_status.internalError, config.log_type.USERS]);
+        res.json(config.messages.couldntTerminateUser).status(config.response_status.internalError);
+    }
+
 })
 
 export default router;
