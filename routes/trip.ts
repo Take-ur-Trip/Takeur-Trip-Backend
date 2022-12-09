@@ -11,13 +11,17 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
     const tokenPayload : any = await res.locals.token as Object; // payload -> logged in User <-> giver
     try{
         const {rows : passengerId} : QueryResult = await query(`SELECT "userId" FROM "public.Users" WHERE email LIKE $1`, [tokenPayload.email]);
-        const {startLat, startLon, endLat, endLon} = req.query;
-        const { startAddress, endAddress } = req.body;
-       const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
-       const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints, startAddress, endAddress]);
-       if(bookQuery > 0) {
-            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} booked`, config.response_status.access, config.log_type.TRIPS]);
-           res.json(config.messages.bookingSuccess).status(config.response_status.access);
+        // const {startLat, startLon, endLat, endLon} = req.query;
+        const { startAddress, endAddress, passengerCount, startLat, startLon, endLat, endLon } = req.body;
+        if(startLat && startLon && endLat && endLon) {
+            const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
+            const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints, startAddress, endAddress, passengerCount]);
+            if(bookQuery > 0) {
+                 await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} booked`, config.response_status.access, config.log_type.TRIPS]);
+                res.json(config.messages.bookingSuccess).status(config.response_status.access);
+             } else {
+                 throw config.messages.bookingError;
+             }
         } else {
             throw config.messages.bookingError;
         }
@@ -55,48 +59,121 @@ router.post('/cancelTrip/:id', jwtAuth, async(req: Request, res: Response) => {
     }
 })
 
-router.post('/acceptTrip/:id', jwtAuth, async (req: Request, res: Response) => {
+// Offers (accepting offer from driver and declining)
+router.post('/offerTrip/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { userId: driverId } = await res.locals.token;
+    const tripId = req.params.id;
     try {
-        //check if logged in user is driver
-        const suggestedPrice = req.body.suggestedPrice;
-        const tokenPayload : any = await res.locals.token as Object; // payload -> logged in User <-> giver
-        const {rows : driverQuery} : QueryResult = await query(`SELECT "userId", "isDriver" FROM "public.Users" WHERE email LIKE $1`, [tokenPayload.email]);
-        const tripId = req.params.id;
-        if(driverQuery[0].isDriver) {
-            // handle...
-            const { rows : tripQuery } : QueryResult = await query(`SELECT status, "driverId", "passengerId", "startPoint", "endPoint" FROM "public.Trips" WHERE "tripId" = $1`, [tripId as string]);
-            if(tripQuery[0].status == config.tripStatus.active) {
-                await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} accept`, config.response_status.prohibition, config.log_type.TRIPS]);
-                res.json(config.messages.tripAlreadyAccepted).status(config.response_status.prohibition);
+        const { suggestedPrice } = req.body;
+        //Check if user is a driver
+        const { rows : isDriverQuery } = await query(`SELECT "userId", email, "isDriver" FROM "public.Users" WHERE "userId" = $1`, [driverId]);
+        if(isDriverQuery[0].isDriver) {
+            // HERE CHECK IF DRIVER IS THE PASSENGER WHO BOOKS THE TRIP
+            const {rows : checkIfDriverIsntPassenger} : QueryResult = await query(`SELECT "tripId", "passengerId" FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
+            if(checkIfDriverIsntPassenger[0].passengerId == driverId) {
+                await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)} cannot send offer to trip which belongs to you, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+                res.json(config.messages.tripOfferingCannotOfferYourOwnTrip).status(config.response_status.prohibition);
             } else {
-                if(tripQuery[0].status == config.tripStatus.canceled) {
-                    res.json(config.messages.tripPreviouslyCanceled).status(config.response_status.prohibition);
-                    await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel (previously canceled)`, config.response_status.prohibition, config.log_type.TRIPS]);
+                const {rowCount : checkOfferStatus} : QueryResult = await query(`SELECT "tripId", "driverId" FROM "public.TripOffers" WHERE "driverId" = $1 AND "tripId" = $2`, [driverId, tripId]);
+                if(checkOfferStatus > 0) {
+                    await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)} cannot send two the same offers, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripOfferingSameOfferError).status(config.response_status.prohibition);
                 } else {
-                    if(tripQuery[0].passengerId == driverQuery[0].userId) {
-                        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} accept`, config.response_status.prohibition, config.log_type.TRIPS]);
-                        res.json(config.messages.cannotAcceptSelfTrip).status(config.response_status.prohibition);
+                    const {rowCount : offerQuery} : QueryResult = await query(`INSERT INTO "public.TripOffers"("tripId", "dateOfOffer", "driverId", status, "suggestedPrice") VALUES($1, NOW(), $2, $3, $4)`, [tripId, driverId, config.tripOfferStatus.pending, suggestedPrice]);
+                    if(offerQuery > 0) {
+                        await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)}, ${tripId}`, config.response_status.access, config.log_type.TRIPS]);
+                        res.json(config.messages.tripOfferingSuccess).status(config.response_status.access);
                     } else {
-                        const { rowCount : acceptTripQuery } : QueryResult = await query(`UPDATE "public.Trips" SET "driverId" = $1, status = $2, "dateOfAccept" = NOW() WHERE "tripId" = $3`, [driverQuery[0].userId, config.tripStatus.active, tripId]);
-                        if(acceptTripQuery < 1) {
-                            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
-                            res.json(config.messages.acceptingTripError).status(config.response_status.internalError);
-                        } else {
-                            const { x : lat1, y: lng1 } = tripQuery[0].startPoint;
-                            const { x : lat2, y: lng2 } = tripQuery[0].endPoint;
-                            const distanceBetweenPoints : number = getDistanceBetweenPoints(lat1, lng1, lat2, lng2);
-                            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId}`, config.response_status.access, config.log_type.TRIPS]);
-                            res.json({...config.messages.acceptingTripSuccess, ...{startPoint: tripQuery[0].startPoint}, ...{endPoint:tripQuery[0].endPoint}, ...{distance: distanceBetweenPoints}}).status(config.response_status.access);
-                        }
+                        await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
+                        res.json(config.messages.tripOfferingError).status(config.response_status.internalError);
                     }
                 }
             }
         } else {
-            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} USER IS NOT A DRIVER`, config.response_status.prohibition, config.log_type.TRIPS]);
+            //User is not a driver :(
+            await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)} is not a driver, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
             res.json(config.messages.userIsNotDriver).status(config.response_status.prohibition);
         }
     } catch(error) {
-        res.json(config.messages.acceptingTripError).status(config.response_status.internalError);
+        // res with trip offering error!
+        console.log(error)
+        await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
+        res.json(config.messages.tripOfferingError).status(config.response_status.internalError);
+    }
+})
+
+router.post('/acceptOfferTrip/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { email: userEmail } = await res.locals.token;
+    const tripOfferId = req.params.id;
+    try {
+        // Check if offer exists
+        // Check if trip belongs to passenger or driver
+        const { rowCount : ifIsPending } = await query(`SELECT status FROM "public.TripOffers" WHERE status LIKE $1 AND "tripOfferId" = $2`, [config.tripOfferStatus.pending, tripOfferId]);
+        if(ifIsPending > 0) {
+            const { rowCount : ifBelongsToUser } = await query(`SELECT "userId", email, "tripId" FROM "public.Users" pu join "public.Trips" pt ON pu."userId" = pt."passengerId" or pu."userId" = pt."driverId"  where pu."email" LIKE $1;`, [userEmail]);
+            if(ifBelongsToUser > 0) {
+                await query(`BEGIN`, []);
+                const { rows : tripIdQuery } = await query(`SELECT pt."tripId" FROM "public.Trips" pt join "public.TripOffers" pto ON pt."tripId" = pto."tripId" where pto."tripOfferId" = $1;`, [tripOfferId]);
+                const { rowCount : tripStatusCommit } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1 WHERE "tripId"=$2`, [config.tripStatus.active, tripIdQuery[0].tripId]);
+                const { rowCount : acceptTripOfferQuery } : QueryResult = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripOfferId"=$2`, [config.tripOfferStatus.confirmed, tripOfferId]);
+                await query(`COMMIT;`, []);
+                if(tripStatusCommit > 0 && acceptTripOfferQuery > 0) {
+                    await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.access, config.log_type.TRIPS]);
+                    res.json(config.messages.tripAcceptingOfferSuccess).status(config.response_status.access);
+                } else {
+                    await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)} error with updating status, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
+                    res.json(config.messages.tripAcceptingOfferError).status(config.response_status.internalError);
+                }
+        } else {
+                //This trip offer doesnt belong to user :(
+                    await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)} it doesnt belong to user, ${tripOfferId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripAcceptOfferErrorWrongUser).status(config.response_status.prohibition);
+            }
+        }
+        else {
+            await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)} already accepted or declined, ${tripOfferId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+            res.json(config.messages.tripOfferErrorAlreadyDeclinedOrAccepted).status(config.response_status.prohibition);
+        }
+    } catch(error) {
+        console.log(error);
+        // res with trip accepting offer error!
+        await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
+        res.json(config.messages.tripAcceptingOfferError).status(config.response_status.internalError);
+    }
+})
+
+router.post('/declineOfferTrip/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { email: userEmail } = await res.locals.token;
+    const tripOfferId = req.params.id;
+    try {
+        // Check if offer exists
+        // Check if trip belongs to passenger or driver
+        const { rowCount : ifIsPending } = await query(`SELECT status FROM "public.TripOffers" WHERE status LIKE $1 AND "tripOfferId" = $2`, [config.tripOfferStatus.pending, tripOfferId]);
+        if(ifIsPending > 0) {
+            const { rowCount : ifBelongsToUser } = await query(`SELECT "userId", email, "tripId" FROM "public.Users" pu join "public.Trips" pt ON pu."userId" = pt."passengerId" or pu."userId" = pt."driverId"  where pu."email" LIKE $1;`, [userEmail]);
+            if(ifBelongsToUser > 0) {
+                const { rowCount : declineTripOfferQuery } : QueryResult = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripOfferId"=$2`, [config.tripOfferStatus.declined, tripOfferId]);
+                if(declineTripOfferQuery > 0) {
+                    await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.access, config.log_type.TRIPS]);
+                    res.json(config.messages.tripDeclineOfferSuccess).status(config.response_status.access);
+                } else {
+                    await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)} error with updating status, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
+                    res.json(config.messages.tripDeclineOfferError).status(config.response_status.internalError);
+                }
+        } else {
+                //This trip offer doesnt belong to user :(
+                    await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)} it doesnt belong to user, ${tripOfferId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripDeclineOfferErrorWrongUser).status(config.response_status.prohibition);
+            }
+        }
+        else {
+            await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)} already declined or accepted, ${tripOfferId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+            res.json(config.messages.tripOfferErrorAlreadyDeclinedOrAccepted).status(config.response_status.prohibition);
+        }
+    } catch(error) {
+        // res with trip declining offer error!
+        await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
+        res.json(config.messages.tripDeclineOfferError).status(config.response_status.internalError);
     }
 })
 
@@ -123,6 +200,21 @@ router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
         } else {
             const tripId = req.params.id;
             const { rows : trips} : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
+            res.json(trips).status(config.response_status.access);
+        }
+    } catch(err) { 
+        res.json(config.messages.tripFetchingError).status(config.response_status.internalError);
+    }
+})
+
+router.get('/fetchTripsByUserId/:id', jwtAuth, async (req : Request, res: Response) => {
+    try {
+        const userId = req.params.id;
+        if(res.locals.isAdmin) {
+            const { rows : trips} : QueryResult = await query(`select * from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';`, [userId]);
+            res.json(trips).status(config.response_status.access);
+        } else {
+            const { rows : trips} : QueryResult = await query(`select * from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';`, [userId]);
             res.json(trips).status(config.response_status.access);
         }
     } catch(err) { 

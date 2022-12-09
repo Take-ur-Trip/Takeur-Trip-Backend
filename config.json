@@ -9,6 +9,11 @@
         "done" : "DONE",
         "canceled" : "CANCELED"
     },
+    "tripOfferStatus" : {
+        "pending" : "PENDING",
+        "confirmed" : "CONFIRMED",
+        "declined" : "DECLINED"
+    },
     "response_status": {
         "access" : 200,
         "prohibition" : 400,
@@ -164,8 +169,54 @@
             "msg": "Trip has been canceled previously. Cannot accept it anymore."
         },
         "tripCancelAuthError" : {
-            "msgCode": "BKC23",
+            "msgCode": "BKC24",
             "msg": "Cannot cancel trip which doesn't belong to you."
+        },
+
+
+        "tripOfferingSuccess" : {
+            "msgCode": "TO11",
+            "msg": "Trip offer has been sent."
+        },
+        "tripOfferingError" : {
+            "msgCode": "TO21",
+            "msg": "Trip offering error."
+        },
+        "tripOfferingSameOfferError" : {
+            "msgCode": "TO22",
+            "msg": "Cannot send trip offer you have already sent."
+        },
+        "tripOfferingCannotOfferYourOwnTrip" : {
+            "msgCode": "TO23",
+            "msg": "Cannot send trip offer to trip which belongs to you!"
+        },
+        "tripAcceptingOfferSuccess" : {
+            "msgCode": "TOA11",
+            "msg": "Trip offer accepting successful."
+        },
+        "tripAcceptingOfferError" : {
+            "msgCode": "TOA21",
+            "msg": "Trip offer accepting error."
+        },
+        "tripAcceptOfferErrorWrongUser" : {
+            "msgCode": "TOA22",
+            "msg": "Cannot accept trip offer which doesn't belong to you."
+        },
+        "tripDeclineOfferSuccess" : {
+            "msgCode": "TOD11",
+            "msg": "Trip offer declining successful."
+        },
+        "tripDeclineOfferError" : {
+            "msgCode": "TOD21",
+            "msg": "Trip offer declining error."
+        },
+        "tripOfferErrorAlreadyDeclinedOrAccepted" : {
+            "msgCode": "TOD22",
+            "msg": "Trip offer error or has been already accepted or declined. Cannot decline offer now!"
+        },
+        "tripDeclineOfferErrorWrongUser" : {
+            "msgCode": "TOD23",
+            "msg": "Cannot decline trip offer which doesn't belong to you."
         },
 
 
