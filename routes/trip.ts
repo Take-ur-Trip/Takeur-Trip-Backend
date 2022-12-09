@@ -211,10 +211,10 @@ router.get('/fetchTripsByUserId/:id', jwtAuth, async (req : Request, res: Respon
     try {
         const userId = req.params.id;
         if(res.locals.isAdmin) {
-            const { rows : trips} : QueryResult = await query(`select * from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';`, [userId]);
+            const { rows : trips} : QueryResult = await query(`select "tripId", "passengerId", "driverId", "dateOfBook","startPoint" ,"endPoint" ,status,"dateOfAccept","whoHasCanceled" ,distance ,"endAddress" ,"startAddress" ,"passengerCount"  from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';;`, [userId]);
             res.json(trips).status(config.response_status.access);
         } else {
-            const { rows : trips} : QueryResult = await query(`select * from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';`, [userId]);
+            const { rows : trips} : QueryResult = await query(`select "tripId", "passengerId", "driverId", "dateOfBook","startPoint" ,"endPoint" ,status,"dateOfAccept","whoHasCanceled" ,distance ,"endAddress" ,"startAddress" ,"passengerCount"  from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" where pu."userId" = $1 and pt.status like 'BOOKED';`, [userId]);
             res.json(trips).status(config.response_status.access);
         }
     } catch(err) { 
