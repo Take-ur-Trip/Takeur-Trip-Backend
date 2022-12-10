@@ -3,6 +3,8 @@ import query, {log} from "../middlewares/db";
 import { jwtAuth } from "../middlewares/jwt";
 import config from '../config.json';
 import { QueryResult } from "pg";
+import moment from "moment-timezone";
+
 // import { getDistanceBetweenPoints } from "../middlewares/locationHelpers";
 
 const router = Router();
@@ -14,6 +16,7 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
         // const {startLat, startLon, endLat, endLon} = req.query;
         const { startAddress, endAddress, passengerCount, startLat, startLon, endLat, endLon, distance, dateOfTrip } = req.body;
         if(startLat && startLon && endLat && endLon) {
+            // const dateOfTrip_ = moment(dateOfTrip).format('Europe/Warsaw'); XD
             // const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
             const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount", "dateOfTrip") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10, $11)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distance, startAddress, endAddress, passengerCount, dateOfTrip]);
             if(bookQuery > 0) {
@@ -26,6 +29,7 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
             throw config.messages.bookingError;
         }
     } catch(error) {
+        console.log(error)
         await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} ${error}`, config.response_status.internalError, config.log_type.TRIPS]);
         res.json(config.messages.bookingError).status(config.response_status.internalError);
     }
@@ -45,8 +49,13 @@ router.post('/cancelTrip/:id', jwtAuth, async(req: Request, res: Response) => {
             } else {
                 const { rowCount } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1, "whoHasCanceled"=$2 WHERE "tripId"=$3`, [config.tripStatus.canceled, tokenPayload.email, tripId]);
                 if(rowCount > 0) {
-                    await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.access, config.log_type.TRIPS]);
-                   res.json(config.messages.tripCancelSuccess).status(config.response_status.access);
+                    const { rowCount, rows: finalTripAfterCancelling } : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
+                    if(rowCount > 0) {
+                        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.access, config.log_type.TRIPS]);
+                        res.json({...config.messages.tripCancelSuccess, cancelledTrip:finalTripAfterCancelling[0]}).status(config.response_status.access);
+                    } else {
+                        throw config.messages.tripCancelError;
+                    }
                 } else {
                     await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.internalError, config.log_type.TRIPS]);
                     res.json(config.messages.tripCancelError).status(config.response_status.internalError);
