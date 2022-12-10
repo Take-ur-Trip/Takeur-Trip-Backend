@@ -26,7 +26,7 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
             throw config.messages.bookingError;
         }
     } catch(error) {
-        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}`, config.response_status.internalError, config.log_type.TRIPS]);
+        await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} ${error}`, config.response_status.internalError, config.log_type.TRIPS]);
         res.json(config.messages.bookingError).status(config.response_status.internalError);
     }
 })
