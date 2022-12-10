@@ -3,7 +3,7 @@ import query, {log} from "../middlewares/db";
 import { jwtAuth } from "../middlewares/jwt";
 import config from '../config.json';
 import { QueryResult } from "pg";
-import { getDistanceBetweenPoints } from "../middlewares/locationHelpers";
+// import { getDistanceBetweenPoints } from "../middlewares/locationHelpers";
 
 const router = Router();
 
@@ -12,10 +12,10 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
     try{
         const {rows : passengerId} : QueryResult = await query(`SELECT "userId" FROM "public.Users" WHERE email LIKE $1`, [tokenPayload.email]);
         // const {startLat, startLon, endLat, endLon} = req.query;
-        const { startAddress, endAddress, passengerCount, startLat, startLon, endLat, endLon } = req.body;
+        const { startAddress, endAddress, passengerCount, startLat, startLon, endLat, endLon, distance, dateOfTrip } = req.body;
         if(startLat && startLon && endLat && endLon) {
-            const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
-            const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distanceBetweenPoints, startAddress, endAddress, passengerCount]);
+            // const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
+            const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount", "dateOfTrip") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10, NOW())`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distance, startAddress, endAddress, passengerCount]);
             if(bookQuery > 0) {
                  await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} booked`, config.response_status.access, config.log_type.TRIPS]);
                 res.json(config.messages.bookingSuccess).status(config.response_status.access);
@@ -68,7 +68,7 @@ router.post('/offerTrip/:id', jwtAuth, async (req: Request, res: Response) => {
         //Check if user is a driver
         const { rows : isDriverQuery } = await query(`SELECT "userId", email, "isDriver" FROM "public.Users" WHERE "userId" = $1`, [driverId]);
         if(isDriverQuery[0].isDriver) {
-            // HERE CHECK IF DRIVER IS THE PASSENGER WHO BOOKS THE TRIP
+            // HERE CHECK IF DRIVER IS THE PASSENGER WHO BOOKED THE TRIP
             const {rows : checkIfDriverIsntPassenger} : QueryResult = await query(`SELECT "tripId", "passengerId" FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
             if(checkIfDriverIsntPassenger[0].passengerId == driverId) {
                 await log([`TRIP OFFERING ACTION ${JSON.stringify(driverId)} cannot send offer to trip which belongs to you, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
@@ -107,17 +107,18 @@ router.post('/acceptOfferTrip/:id', jwtAuth, async (req: Request, res: Response)
     const tripOfferId = req.params.id;
     try {
         // Check if offer exists
-        // Check if trip belongs to passenger or driver
         const { rowCount : ifIsPending } = await query(`SELECT status FROM "public.TripOffers" WHERE status LIKE $1 AND "tripOfferId" = $2`, [config.tripOfferStatus.pending, tripOfferId]);
         if(ifIsPending > 0) {
-            const { rowCount : ifBelongsToUser } = await query(`SELECT "userId", email, "tripId" FROM "public.Users" pu join "public.Trips" pt ON pu."userId" = pt."passengerId" or pu."userId" = pt."driverId"  where pu."email" LIKE $1;`, [userEmail]);
+            // Check if trip belongs to user
+            const { rowCount : ifBelongsToUser } = await query(`SELECT "userId", email, pt."tripId", pto."tripId" FROM "public.Users" pu join "public.Trips" pt ON pu."userId" = pt."passengerId" or pu."userId" = pt."driverId" join "public.TripOffers" pto ON pt."tripId" = pto."tripId" where pu.email like $1 AND pto."tripOfferId" = $2;`, [userEmail, tripOfferId]);
             if(ifBelongsToUser > 0) {
                 await query(`BEGIN`, []);
-                const { rows : tripIdQuery } = await query(`SELECT pt."tripId" FROM "public.Trips" pt join "public.TripOffers" pto ON pt."tripId" = pto."tripId" where pto."tripOfferId" = $1;`, [tripOfferId]);
-                const { rowCount : tripStatusCommit } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1 WHERE "tripId"=$2`, [config.tripStatus.active, tripIdQuery[0].tripId]);
+                const { rows : tripIdQuery } = await query(`SELECT pt."tripId", pto."driverId" FROM "public.Trips" pt join "public.TripOffers" pto ON pt."tripId" = pto."tripId" where pto."tripOfferId" = $1;`, [tripOfferId]);
+                const { rowCount : tripStatusCommit } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1, "driverId" = $2, "dateOfAccept" = NOW() WHERE "tripId"=$3`, [config.tripStatus.active, tripIdQuery[0].driverId, tripIdQuery[0].tripId]);
+                const { rowCount : tripOfferDeclineOther } : QueryResult = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripId"=$2 AND "tripOfferId" != $3`, [config.tripOfferStatus.declined, tripIdQuery[0].tripId, tripOfferId]);
                 const { rowCount : acceptTripOfferQuery } : QueryResult = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripOfferId"=$2`, [config.tripOfferStatus.confirmed, tripOfferId]);
                 await query(`COMMIT;`, []);
-                if(tripStatusCommit > 0 && acceptTripOfferQuery > 0) {
+                if(tripStatusCommit > 0 && acceptTripOfferQuery > 0 && tripOfferDeclineOther >= 0) {
                     await log([`TRIP ACCEPTING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.access, config.log_type.TRIPS]);
                     res.json(config.messages.tripAcceptingOfferSuccess).status(config.response_status.access);
                 } else {
@@ -147,9 +148,9 @@ router.post('/declineOfferTrip/:id', jwtAuth, async (req: Request, res: Response
     const tripOfferId = req.params.id;
     try {
         // Check if offer exists
-        // Check if trip belongs to passenger or driver
         const { rowCount : ifIsPending } = await query(`SELECT status FROM "public.TripOffers" WHERE status LIKE $1 AND "tripOfferId" = $2`, [config.tripOfferStatus.pending, tripOfferId]);
         if(ifIsPending > 0) {
+            // Check if trip belongs to user
             const { rowCount : ifBelongsToUser } = await query(`SELECT "userId", email, "tripId" FROM "public.Users" pu join "public.Trips" pt ON pu."userId" = pt."passengerId" or pu."userId" = pt."driverId"  where pu."email" LIKE $1;`, [userEmail]);
             if(ifBelongsToUser > 0) {
                 const { rowCount : declineTripOfferQuery } : QueryResult = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripOfferId"=$2`, [config.tripOfferStatus.declined, tripOfferId]);
