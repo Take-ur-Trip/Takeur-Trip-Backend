@@ -15,7 +15,7 @@ router.post('/book', jwtAuth, async (req: Request, res: Response) => {
         const { startAddress, endAddress, passengerCount, startLat, startLon, endLat, endLon, distance, dateOfTrip } = req.body;
         if(startLat && startLon && endLat && endLon) {
             // const distanceBetweenPoints : number = getDistanceBetweenPoints(startLat as unknown as number, startLon as unknown as number, endLat as unknown as number, endLon as unknown as number);
-            const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount", "dateOfTrip") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10, NOW())`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distance, startAddress, endAddress, passengerCount]);
+            const {rowCount : bookQuery} : QueryResult = await query(`INSERT INTO "public.Trips"("passengerId", "dateOfBook", "startPoint", "endPoint", status, distance, "startAddress", "endAddress", "passengerCount", "dateOfTrip") VALUES($1, NOW(), POINT($2, $3), POINT($4, $5), $6, $7, $8, $9, $10, $11)`, [passengerId[0].userId, startLat, startLon, endLat, endLon, config.tripStatus.booked, distance, startAddress, endAddress, passengerCount, dateOfTrip]);
             if(bookQuery > 0) {
                  await log([`TRIP ACTION ${JSON.stringify(tokenPayload)} booked`, config.response_status.access, config.log_type.TRIPS]);
                 res.json(config.messages.bookingSuccess).status(config.response_status.access);
