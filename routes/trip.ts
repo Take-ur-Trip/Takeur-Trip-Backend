@@ -39,15 +39,21 @@ router.post('/cancelTrip/:id', jwtAuth, async(req: Request, res: Response) => {
     const tokenPayload : any = await res.locals.token as Object; // payload -> logged in User <-> giver
     const tripId = req.params.id;
     try {
-        const { rows : cancelTripQuery } : QueryResult = await query(`SELECT u1.email as "driverEmail", u2.email "passengerEmail", status, "driverId", "passengerId", "startPoint", "endPoint" FROM "public.Trips" t JOIN "public.Users" "u1" ON u1."userId"=t."driverId" JOIN "public.Users" "u2" ON u2."userId"=t."passengerId" WHERE "tripId" = $1`, [tripId as string]);
+        // TO CHANGE !!@#!@#
+        const { rows : cancelTripQuery } : QueryResult = await query(`select pt."tripId", pt."passengerId", pt."driverId", pt.status from "public.Trips" pt join "public.Users" pu on pt."passengerId" = pu."userId" or pt."driverId" = pu."userId" where "tripId" = $1`, [tripId]);
+        // console.log(cancelTripQuery)''
         if(cancelTripQuery[0].status == config.tripStatus.canceled) {
             await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.prohibition, config.log_type.TRIPS]);
             res.json(config.messages.tripAlreadyCanceled).status(config.response_status.prohibition)
+        } else if (cancelTripQuery[0].status == config.tripStatus.done) {
+            await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.prohibition, config.log_type.TRIPS]);
+            res.json(config.messages.cannotCancelTripWhichStateIsDone).status(config.response_status.prohibition)
         } else {
-            if(!(cancelTripQuery[0].passengerEmail == tokenPayload.email || cancelTripQuery[0].driverEmail == tokenPayload.email)) {
+            if(!(cancelTripQuery[0].passengerId == tokenPayload.userId || cancelTripQuery[0].driverId == tokenPayload.userId)) {
+                await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} try to cancel not self trip`, config.response_status.prohibition, config.log_type.TRIPS]);
                 res.json(config.messages.tripCancelAuthError).status(config.response_status.prohibition);
             } else {
-                const { rowCount } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1, "whoHasCanceled"=$2 WHERE "tripId"=$3`, [config.tripStatus.canceled, tokenPayload.email, tripId]);
+                const { rowCount } : QueryResult = await query(`UPDATE "public.Trips" SET status=$1, "whoHasCanceled"=$2 WHERE "tripId"=$3`, [config.tripStatus.canceled, tokenPayload.userId, tripId]);
                 if(rowCount > 0) {
                     const { rowCount, rows: finalTripAfterCancelling } : QueryResult = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1`, [tripId]);
                     if(rowCount > 0) {
@@ -63,6 +69,7 @@ router.post('/cancelTrip/:id', jwtAuth, async(req: Request, res: Response) => {
             }
         }
     } catch(error) {
+        console.log(error)
         await log([`TRIP ACTION ${JSON.stringify(tokenPayload)}, ${tripId} cancel`, config.response_status.internalError, config.log_type.TRIPS]);
         res.json(config.messages.tripCancelError).status(config.response_status.internalError)
     }
@@ -111,6 +118,7 @@ router.post('/offerTrip/:id', jwtAuth, async (req: Request, res: Response) => {
     }
 })
 
+// Route for passenger -- it accepts pending offer from driver
 router.post('/acceptOfferTrip/:id', jwtAuth, async (req: Request, res: Response) => {
     const { email: userEmail } = await res.locals.token;
     const tripOfferId = req.params.id;
@@ -184,6 +192,140 @@ router.post('/declineOfferTrip/:id', jwtAuth, async (req: Request, res: Response
         // res with trip declining offer error!
         await log([`TRIP DECLINING OFFER ACTION ${JSON.stringify(userEmail)}, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
         res.json(config.messages.tripDeclineOfferError).status(config.response_status.internalError);
+    }
+})
+
+// Route for driver -- it cancels his offer (only if not already accepted or canceled)
+router.post('/cancelOfferTrip/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { id: tripOfferId } = req.params;
+    const { userId : driverId } = res.locals.token;
+    try {
+        const { rows : tripOfferRows, rowCount: checkIfOfferExists } = await query(`SELECT * FROM "public.TripOffers" WHERE "tripOfferId" = $1 AND "driverId" = $2`, [tripOfferId, driverId]);
+        if(checkIfOfferExists > 0) {
+            const { status : tripStatus } = tripOfferRows[0];
+            switch(tripStatus) {
+                case config.tripOfferStatus.canceled:
+                    await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId} ALREADY CANCELED`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripCancelOfferAlreadyCanceled).status(config.response_status.prohibition);
+                    break;
+                case config.tripOfferStatus.confirmed:
+                case config.tripOfferStatus.declined:
+                    await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId} ALREADY DECLINED OR ACCEPTED`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripCancelOfferAlreadyDeclinedOrAccepted).status(config.response_status.prohibition);
+                    break;
+                case config.tripOfferStatus.pending:
+                    const { rows : updateQuery, rowCount: updateQueryRowCount} = await query(`UPDATE "public.TripOffers" SET status=$1 WHERE "tripOfferId" = $2`, [config.tripOfferStatus.canceled, tripOfferId]);
+                    if(updateQueryRowCount > 0) {
+                        await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId}`, config.response_status.access, config.log_type.TRIPS]);
+                        res.json(config.messages.tripCancelOfferSuccess).status(config.response_status.access);
+                    }  else {
+                        await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                        res.json(config.messages.tripCancelOfferError).status(config.response_status.prohibition);
+                    }
+                    break;
+                default:
+                    throw config.messages.tripCancelOfferError;
+            }
+        } else {
+            await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId} DOESNT EXISTS OR WRONG USER`, config.response_status.prohibition, config.log_type.TRIPS]);
+            res.json(config.messages.tripCancelOfferError).status(config.response_status.prohibition);
+        }
+    } catch(error) {
+        await log([`TRIP CANCELING OFFER ACTION ${JSON.stringify(driverId)}, ${tripOfferId}`, config.response_status.internalError, config.log_type.TRIPS]);
+        res.json(config.messages.tripCancelOfferError).status(config.response_status.internalError);
+    }
+})
+
+/* 
+
+set trip status to DONE
+
+1. check trip id and check ids of passenger and driver
+2. compare passenger and driver id to the token
+3. decide action based on status and driver/passenger id
+
+*/
+
+router.post('/done/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { id: tripId } = req.params;
+    const { userId } = res.locals.token;
+    try {
+        const { rows : tripRow, rowCount: tripRowsCount } = await query(`SELECT * FROM "public.Trips" WHERE "tripId" = $1 AND ("driverId" = $2 OR "passengerId" = $2)`, [tripId, userId])
+        if(tripRowsCount > 0) {
+            const { status: tripStatus, driverId, passengerId, whoHasDone } = tripRow[0];
+            switch(tripStatus) {
+                case config.tripStatus.active:
+                    // here the magic comes :))
+                    switch(whoHasDone) {
+                        case null:
+                            const { rows : updateQuery, rowCount: updateQueryRowCount} = await query(`UPDATE "public.Trips" SET "whoHasDone"=$1 WHERE "tripId" = $2`, [userId, tripId]);
+                            if(updateQueryRowCount > 0) {
+                                if(whoHasDone == userId) {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE TO DONE SECOND TIME (WAITING FOR 2ND USER)`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneAlreadyDoneHalf).status(config.response_status.prohibition);
+                                } else {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} 1/2 done`, config.response_status.access, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneHalfSuccess).status(config.response_status.access);
+                                }
+                            }  else {
+                                await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                res.json(config.messages.tripStateDoneError).status(config.response_status.prohibition);
+                            }
+                            break;
+                        case passengerId:
+                            if(driverId == userId) {
+                                const { rows : updateQueryByDriver, rowCount: updateQueryRowCountByDriver} = await query(`UPDATE "public.Trips" SET status=$1 WHERE "tripId" = $2 AND "passengerId" = $3`, [config.tripStatus.done, tripId, passengerId]);
+                                if(updateQueryRowCountByDriver > 0) {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} 2/2 done`, config.response_status.access, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneSuccess).status(config.response_status.access);
+                                }  else {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneError).status(config.response_status.prohibition);
+                                }
+                            } else {
+                                await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                res.json(config.messages.tripStateDoneError).status(config.response_status.prohibition);
+                            }
+                            break;
+                        case driverId:
+                            if(passengerId == userId) {
+                                const { rows : updateQueryByPassenger, rowCount: updateQueryRowCountByPassenger} = await query(`UPDATE "public.Trips" SET status=$1 WHERE "tripId" = $2 AND "driverId" = $3`, [config.tripStatus.done, tripId, driverId]);
+                                if(updateQueryRowCountByPassenger > 0) {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} 2/2 done`, config.response_status.access, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneSuccess).status(config.response_status.access);
+                                }  else {
+                                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                    res.json(config.messages.tripStateDoneError).status(config.response_status.prohibition);
+                                }
+                            } else {
+                                await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} CANT UPDATE`, config.response_status.prohibition, config.log_type.TRIPS]);
+                                res.json(config.messages.tripStateDoneError).status(config.response_status.prohibition);
+                            }
+                            break;
+                        default:
+                            throw config.messages.tripStateDoneError;
+                    }
+                    break;
+                case config.tripStatus.done:
+                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId} ALREADY CANCELED`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripStateDoneAlreadyDone).status(config.response_status.prohibition);
+                    break;
+                case config.tripStatus.booked:
+                case config.tripStatus.canceled:
+                    await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+                    res.json(config.messages.tripStateDoneIsntActive).status(config.response_status.prohibition);
+                    break;
+                default:
+                    throw config.messages.tripStateDoneError;
+            }
+        } else {
+            await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId}`, config.response_status.prohibition, config.log_type.TRIPS]);
+            res.json(config.messages.cannotFindTripId).status(config.response_status.prohibition); 
+        }
+    } catch(error) {
+        console.log(error)
+        await log([`TRIP SET STATE DONE ACTION ${JSON.stringify(userId)}, ${tripId}`, config.response_status.internalError, config.log_type.TRIPS]);
+        res.json(config.messages.tripStateDoneError).status(config.response_status.internalError);
     }
 })
 

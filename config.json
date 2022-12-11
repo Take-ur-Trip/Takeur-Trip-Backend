@@ -12,7 +12,8 @@
     "tripOfferStatus" : {
         "pending" : "PENDING",
         "confirmed" : "CONFIRMED",
-        "declined" : "DECLINED"
+        "declined" : "DECLINED",
+        "canceled" : "CANCELED"
     },
     "response_status": {
         "access" : 200,
@@ -152,6 +153,8 @@
             "msgCode": "BKA41",
             "msg": "Trip information fetching error."
         },
+
+
         "tripCancelError" : {
             "msgCode": "BKC21",
             "msg": "Trip cancel error."
@@ -190,6 +193,8 @@
             "msgCode": "TO23",
             "msg": "Cannot send trip offer to trip which belongs to you!"
         },
+
+
         "tripAcceptingOfferSuccess" : {
             "msgCode": "TOA11",
             "msg": "Trip offer accepting successful."
@@ -202,6 +207,8 @@
             "msgCode": "TOA22",
             "msg": "Cannot accept trip offer which doesn't belong to you."
         },
+
+
         "tripDeclineOfferSuccess" : {
             "msgCode": "TOD11",
             "msg": "Trip offer declining successful."
@@ -220,7 +227,66 @@
         },
 
 
+        "tripCancelOfferSuccess" : {
+            "msgCode": "TCO11",
+            "msg": "Trip offer cancel success."
+        },
+        "tripCancelOfferError" : {
+            "msgCode": "TCO21",
+            "msg": "Trip offer cancel error."
+        },
+        "tripCancelOfferWrongUser" : {
+            "msgCode": "TCO22",
+            "msg": "Cannot cancel trip offer which doesn't belong to you."
+        },
+        "tripCancelOfferAlreadyCanceled" : {
+            "msgCode": "TCO23",
+            "msg": "Cannot cancel trip offer which has been already canceled."
+        },
+        "tripCancelOfferAlreadyDeclinedOrAccepted" : {
+            "msgCode": "TCO24",
+            "msg": "Cannot cancel trip offer which has been already declined or accepted."
+        },
+        
 
+        "tripStateDoneSuccess" : {
+            "msgCode": "TSD11",
+            "msg": "Trip setting state done success. (2/2)"
+        },
+        "tripStateDoneHalfSuccess" : {
+            "msgCode": "TSD12",
+            "msg": "Trip setting state done success. The driver/passenger must also set state done. (1/2)"
+        },
+        "tripStateDoneError" : {
+            "msgCode": "TSD21",
+            "msg": "Trip setting state done error."
+        },
+        "tripStateDoneWrongUser" : {
+            "msgCode": "TSD22",
+            "msg": "Cannot set trip state done which doesn't belong to you."
+        },
+        "tripStateDoneAlreadyDone" : {
+            "msgCode": "TSD23",
+            "msg": "Cannot set trip state done which has been already changed to done."
+        },
+        "tripStateDoneAlreadyDoneHalf" : {
+            "msgCode": "TSD24",
+            "msg": "Cannot set trip state done which has been already changed to done by you. Waiting for second side to accept."
+        },
+        "tripStateDoneIsntActive" : {
+            "msgCode": "TSD25",
+            "msg": "You can change state done only to active trip."
+        },
+        
+        
+        "cannotFindTripId" : {
+            "msgCode": "TRIP21",
+            "msg": "Cannot find trip with this ID."
+        },
+        "cannotCancelTripWhichStateIsDone" : {
+            "msgCode": "TRIP22",
+            "msg": "Cannot cancel trip which has been done."
+        },
         "fetchingLogsError": {
             "msgCode": "L21",
             "msg": "Error with fetching logs."
