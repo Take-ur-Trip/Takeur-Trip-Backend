@@ -189,8 +189,12 @@
             "msgCode": "TO22",
             "msg": "Cannot send trip offer you have already sent."
         },
-        "tripOfferingCannotOfferYourOwnTrip" : {
+        "tripOfferingErrorOnlyBookedCanBeOffered" : {
             "msgCode": "TO23",
+            "msg": "Trip have been canceled, done or is still active. You can offer only a booked (pending) trip."
+        },
+        "tripOfferingCannotOfferYourOwnTrip" : {
+            "msgCode": "TO24",
             "msg": "Cannot send trip offer to trip which belongs to you!"
         },
 
