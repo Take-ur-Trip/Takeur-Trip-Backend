@@ -4,7 +4,7 @@ import config from '../config.json';
 
 export const requestRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5,
+    max: 55,
     standardHeaders: true,
     legacyHeaders: false,
     statusCode: 429,

@@ -221,6 +221,76 @@ router.get('/fetch/:id', jwtAuth, async (req : Request, res: Response) => {
     }
 })
 
+// Update user informations
+router.post('/update/:id', jwtAuth, async (req: Request, res: Response) => {
+    const { userId: loggedInUserId} = res.locals.token;
+    const { id } = req.params;
+    const toUpdate = req.body;
+    try {
+        if(loggedInUserId != id) {
+            await log([`UPDATE USER ACTION ${JSON.stringify(loggedInUserId)} wanted to change ${JSON.stringify(id)}`, config.response_status.prohibition, config.log_type.USERS]);
+            res.json(config.messages.couldntUpdateUserInfo).status(config.response_status.prohibition);
+        } else {
+            const whatHasBeenUpdated = []
+            for(const parameter in toUpdate) {
+                switch(parameter) {
+                    case 'boarding':
+                        const {rows: checkIfBoardingCompleted} = await query(`select boarding from "public.Users" pu where "userId" = $1;`, [loggedInUserId]);
+                        if(checkIfBoardingCompleted[0].boarding) {                            
+                            await log([`UPDATE USER ACTION (boarding) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
+                        } else {
+                            const {rowCount: boardingUpdateQuery} = await query(`update "public.Users" set boarding = $1 where "userId" = $2;`, [toUpdate[parameter], loggedInUserId]);
+                            if(boardingUpdateQuery) {
+                                await log([`UPDATE USER ACTION (boarding) ${JSON.stringify(loggedInUserId)}`, config.response_status.access, config.log_type.USERS]);
+                                whatHasBeenUpdated.push({'boarding': toUpdate[parameter]})
+                            } else {
+                                await log([`UPDATE USER ACTION (boarding) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
+                                whatHasBeenUpdated.push({'boarding': 'error'})}
+                        }
+                        break;
+                    case 'bio':
+                        const {rowCount: bioUpdateQuery} = await query(`update "public.Users" set bio = $1 where "userId" = $2;`, [toUpdate[parameter], loggedInUserId]);
+                        if(bioUpdateQuery) {
+                            await log([`UPDATE USER ACTION (bio) ${JSON.stringify(loggedInUserId)}`, config.response_status.access, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'bio' : toUpdate[parameter]})
+                        } else {
+                            await log([`UPDATE USER ACTION (bio) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'bio' : 'error'})                      
+                        }
+                        break;
+                    case 'phone':
+                        const {rowCount: phoneUpdateQuery} = await query(`update "public.Users" set phone = $1 where "userId" = $2;`, [toUpdate[parameter], loggedInUserId]);
+                        if(phoneUpdateQuery) {
+                            await log([`UPDATE USER ACTION (phone) ${JSON.stringify(loggedInUserId)}`, config.response_status.access, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'phone': toUpdate[parameter]})
+                        } else {
+                            await log([`UPDATE USER ACTION (phone) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'phone': 'error'})
+                        }
+                        break;
+                    case 'firstName':
+                        const {rowCount: firstNameUpdateQuery} = await query(`update "public.Users" set "firstName" = $1 where "userId" = $2;`, [toUpdate[parameter], loggedInUserId]);
+                        if(firstNameUpdateQuery) {
+                            await log([`UPDATE USER ACTION (firstName) ${JSON.stringify(loggedInUserId)}`, config.response_status.access, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'firstName': toUpdate[parameter]})
+                        } else {
+                            await log([`UPDATE USER ACTION (firstName) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
+                            whatHasBeenUpdated.push({'firstName': 'error'})
+                        }
+                        break;
+                    default:
+                        await log([`UPDATE USER ACTION (default switch) ${JSON.stringify(loggedInUserId)}`, config.response_status.internalError, config.log_type.USERS]);
+                        break;
+                }
+            }
+            res.json({...config.messages.updatingUserInfoSuccess, ...{updated: whatHasBeenUpdated}}).status(config.response_status.access);
+        }
+    } catch(error) {
+        await log([`UPDATE USER ACTION ${JSON.stringify(loggedInUserId)}`, config.response_status.internalError, config.log_type.USERS]);
+        res.json(config.messages.couldntUpdateUserInfo).status(config.response_status.internalError);
+    }
+})
+
 
 // Admin dashboard routes!
 router.post('/authAdmin', async (req : Request, res : Response) => {
@@ -258,11 +328,16 @@ router.post('/terminateUser', jwtAuth, async (req: Request, res: Response) => {
             await query(`BEGIN`, []);
             const { rows : ratingsDeletion} = await query(`DELETE FROM "public.Ratings" where "userId" = $1;`, [userId]);
             const { rows : tripStatusUpdate} = await query(`UPDATE "public.Trips" SET status='${config.tripStatus.canceled}' WHERE "passengerId" = $1 OR "driverId" = $1;`, [userId]);
+            const { rows : tripOffersStatusUpdate } = await query(`with selected as (select "tripOfferId" from "public.TripOffers" pto join "public.Trips" pt on pto."tripId"=pt."tripId" where pt."passengerId" = $1 or pto."driverId" = $1 for update) update "public.TripOffers" set status = 'CANCELED' where "tripOfferId" in (select * from selected)`, [userId])
+            const { rows : tripOffersDriverUpdate} = await query(`UPDATE "public.TripOffers" SET "driverId"=null WHERE "driverId" = $1;`, [userId]);
             const { rows : driversUpdate} = await query(`UPDATE "public.Trips" SET "driverId"=null WHERE "driverId" = $1;`, [userId]);
             const { rows : passengersUpdate} = await query(`UPDATE "public.Trips" SET "passengerId"=null WHERE "passengerId" = $1;`, [userId]);
+            //update trip offers
+            //here
+            //
             const { rowCount : userDeletion} = await query(`DELETE FROM "public.Users" where "userId" = $1;`, [userId]);
             await query(`COMMIT;`, []);
-            if(userDeletion && ratingsDeletion && driversUpdate && passengersUpdate && tripStatusUpdate) {  
+            if(userDeletion && ratingsDeletion && driversUpdate && passengersUpdate && tripStatusUpdate && tripOffersStatusUpdate && tripOffersDriverUpdate) {  
                 await log([`TERMINATING USER ACTION ${userId}`, config.response_status.access, config.log_type.USERS]);
                 res.json(config.messages.terminatingUserSuccessful).status(config.response_status.access);  
             } else {

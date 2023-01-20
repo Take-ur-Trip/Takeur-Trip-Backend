@@ -43,6 +43,14 @@
             "msgCode": "U13",
             "msg": "User has been registred."
         },
+        "couldntUpdateUserInfo": {
+            "msgCode": "U14",
+            "msg": "Couldn't update user informations."
+        },
+        "updatingUserInfoSuccess": {
+            "msgCode": "U15",
+            "msg": "Updating user info success."
+        },
         "verifyError" : {
             "msgCode": "V1",
             "msg": "Verification error."
