@@ -3,7 +3,7 @@ import query, {log} from '../middlewares/db';
 import Router from "express-promise-router";
 import config from '../config.json';
 import bcrypt from 'bcrypt';
-import { sanitizeString } from "../middlewares/sanitizeString";
+import { isEmail, sanitizeString } from "../middlewares/sanitizeString";
 import { generateRandomHash, sendMail } from "../middlewares/mailer";
 import { QueryResult } from "pg";
 import jwt, { Secret } from 'jsonwebtoken';
@@ -25,27 +25,31 @@ router.post('/register', async (req: Request<CredentialsModel>, res: Response) =
             password : req.body.password
         }
         await sanitizeString(user)
-        const { rows : emailRows} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1`, [user.email]);
-        if(!(emailRows.length < 1)) {
-            res.json(config.messages.userAlreadyRegistred).status(config.response_status.prohibition);
-        } else {
-            const saltHash = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(user.password, saltHash);
-            const {rowCount: regQuery} = await query(`INSERT INTO "public.Users" (email, password, "accountCreated") VALUES($1, $2, NOW())`, [user.email, hashedPassword]);
-            if(regQuery > 0) {
-                const { rows : registredUser} = await query(`SELECT * FROM "public.Users" WHERE email LIKE $1`, [user.email]);
-                const token : string = jwt.sign({userId: registredUser[0].userId, email: registredUser[0].email}, secretKeyJwt);
-                await sendMail(user.email, token);
-                await log([`REGISTER ACTION ${JSON.stringify({email: user.email, token})}`, config.response_status.access, config.log_type.USERS]);
-                // await query(`UPDATE "public.Users" SET verification=$1 WHERE email LIKE $2`, [verifyHash, user.email]);
-                const resUserObj : Object = { token, user: registredUser };
-                res.set({
-                    'Authorization' : token
-                }).json({...config.messages.registredUser, ...resUserObj}).status(config.response_status.access);
+        if(isEmail(user.email)) {
+            const { rows : emailRows} = await query(`SELECT email FROM "public.Users" WHERE email LIKE $1`, [user.email]);
+            if(!(emailRows.length < 1)) {
+                res.json(config.messages.userAlreadyRegistred).status(config.response_status.prohibition);
             } else {
-                await log([`REGISTER ACTION ${JSON.stringify(user.email)}`, config.response_status.internalError, config.log_type.USERS]);
-                res.json(config.messages.couldntRegisterUser).status(config.response_status.internalError);
+                const saltHash = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(user.password, saltHash);
+                const {rowCount: regQuery} = await query(`INSERT INTO "public.Users" (email, password, "accountCreated") VALUES($1, $2, NOW())`, [user.email, hashedPassword]);
+                if(regQuery > 0) {
+                    const { rows : registredUser} = await query(`SELECT * FROM "public.Users" WHERE email LIKE $1`, [user.email]);
+                    const token : string = jwt.sign({userId: registredUser[0].userId, email: registredUser[0].email}, secretKeyJwt);
+                    await sendMail(user.email, token);
+                    await log([`REGISTER ACTION ${JSON.stringify({email: user.email, token})}`, config.response_status.access, config.log_type.USERS]);
+                    // await query(`UPDATE "public.Users" SET verification=$1 WHERE email LIKE $2`, [verifyHash, user.email]);
+                    const resUserObj : Object = { token, user: registredUser };
+                    res.set({
+                        'Authorization' : token
+                    }).json({...config.messages.registredUser, ...resUserObj}).status(config.response_status.access);
+                } else {
+                    await log([`REGISTER ACTION ${JSON.stringify(user.email)}`, config.response_status.internalError, config.log_type.USERS]);
+                    res.json(config.messages.couldntRegisterUser).status(config.response_status.internalError);
+                }
             }
+        } else {
+            throw new Error(`${JSON.stringify(config.messages.couldntRegisterUserWrongEmailFormat)}`)
         }
     } catch (error) {
         await log([`REGISTER ACTION ${error}`, config.response_status.internalError, config.log_type.USERS]);
@@ -74,6 +78,7 @@ router.get('/verify', async (req : Request, res: Response) => {
                 } else {
                     const verifyQuery : QueryResult = await query(`UPDATE "public.Users" SET verification=true WHERE  email LIKE $1`, [email]);
                     if(verifyQuery.rowCount <= 0) {
+                        await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.internalError, config.log_type.USERS]);
                         res.json(config.messages.verifyError).status(config.response_status.internalError);
                     } else {
                         await log([`VERIFY ACTION ${JSON.stringify(hash)}`, config.response_status.access, config.log_type.USERS]);
@@ -94,7 +99,7 @@ router.post('/auth', async (req : Request, res : Response) => {
         const email = req.body.email as string;
         const password = req.body.password as string;
         const { rows : emailRows} = await query(`SELECT * FROM "public.Users" WHERE email LIKE $1`, [email]);
-        if(emailRows.length < 1) {
+        if(emailRows.length < 1 && !isEmail(email)) {
             await log([`AUTH ACTION ${JSON.stringify(email)}`, config.response_status.prohibition, config.log_type.USERS]);
             res.json(config.messages.authIncorrectCredentials).status(config.response_status.prohibition);
         } else {
@@ -245,7 +250,8 @@ router.post('/update/:id', jwtAuth, async (req: Request, res: Response) => {
                                 whatHasBeenUpdated.push({'boarding': toUpdate[parameter]})
                             } else {
                                 await log([`UPDATE USER ACTION (boarding) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
-                                whatHasBeenUpdated.push({'boarding': 'error'})}
+                                throw new Error(`${JSON.stringify(config.messages.couldntUpdateUserInfo)}`);
+                            }
                         }
                         break;
                     case 'bio':
@@ -255,7 +261,7 @@ router.post('/update/:id', jwtAuth, async (req: Request, res: Response) => {
                             whatHasBeenUpdated.push({'bio' : toUpdate[parameter]})
                         } else {
                             await log([`UPDATE USER ACTION (bio) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
-                            whatHasBeenUpdated.push({'bio' : 'error'})                      
+                            throw new Error(`${JSON.stringify(config.messages.couldntUpdateUserInfo)}`);                    
                         }
                         break;
                     case 'phone':
@@ -265,7 +271,7 @@ router.post('/update/:id', jwtAuth, async (req: Request, res: Response) => {
                             whatHasBeenUpdated.push({'phone': toUpdate[parameter]})
                         } else {
                             await log([`UPDATE USER ACTION (phone) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
-                            whatHasBeenUpdated.push({'phone': 'error'})
+                            throw new Error(`${JSON.stringify(config.messages.couldntUpdateUserInfo)}`);
                         }
                         break;
                     case 'firstName':
@@ -275,17 +281,18 @@ router.post('/update/:id', jwtAuth, async (req: Request, res: Response) => {
                             whatHasBeenUpdated.push({'firstName': toUpdate[parameter]})
                         } else {
                             await log([`UPDATE USER ACTION (firstName) ${JSON.stringify(loggedInUserId)}`, config.response_status.prohibition, config.log_type.USERS]);
-                            whatHasBeenUpdated.push({'firstName': 'error'})
+                            throw new Error(`${JSON.stringify(config.messages.couldntUpdateUserInfo)}`);
                         }
                         break;
                     default:
                         await log([`UPDATE USER ACTION (default switch) ${JSON.stringify(loggedInUserId)}`, config.response_status.internalError, config.log_type.USERS]);
-                        break;
+                        throw new Error(`${JSON.stringify(config.messages.couldntUpdateUserInfo)}`);
                 }
             }
             res.json({...config.messages.updatingUserInfoSuccess, ...{updated: whatHasBeenUpdated}}).status(config.response_status.access);
         }
     } catch(error) {
+        console.log(error)
         await log([`UPDATE USER ACTION ${JSON.stringify(loggedInUserId)}`, config.response_status.internalError, config.log_type.USERS]);
         res.json(config.messages.couldntUpdateUserInfo).status(config.response_status.internalError);
     }

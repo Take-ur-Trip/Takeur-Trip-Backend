@@ -39,6 +39,10 @@
             "msgCode": "U12",
             "msg": "Couldn't register user."
         },
+        "couldntRegisterUserWrongEmailFormat" : {
+            "msgCode": "U16",
+            "msg": "Couldn't register user. (Bad email format)"
+        },
         "registredUser" : {
             "msgCode": "U13",
             "msg": "User has been registred."
